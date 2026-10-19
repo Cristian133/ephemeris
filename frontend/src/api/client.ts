@@ -2,8 +2,11 @@ import type {
   AnnualSunResponse,
   DailySunResponse,
   IrradianceResponse,
+  PanelResponse,
+  SeasonsResponse,
   SolarNoonResponse,
   TrajectoryResponse,
+  TwilightResponse,
 } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -65,4 +68,20 @@ export function getIrradiance(
   numSamples = 96,
 ): Promise<IrradianceResponse> {
   return get('/sol/irradiancia', { latitude, longitude, date, num_samples: numSamples })
+}
+
+export function getTwilight({ latitude, longitude, date }: LocationDate): Promise<TwilightResponse> {
+  return get('/sol/crepusculos', { latitude, longitude, date })
+}
+
+export function getSeasons(year: number): Promise<SeasonsResponse> {
+  return get('/sol/estaciones', { year })
+}
+
+export function getPanel(params: {
+  latitude: number
+  longitude: number
+  year: number
+}): Promise<PanelResponse> {
+  return get('/sol/panel', params)
 }

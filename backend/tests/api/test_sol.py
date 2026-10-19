@@ -255,3 +255,54 @@ def test_irradiancia_rejects_out_of_range_latitude() -> None:
 def test_irradiancia_requires_date() -> None:
     response = client.get("/sol/irradiancia", params={"latitude": 0.0, "longitude": 0.0})
     assert response.status_code == 422
+
+
+def test_crepusculos_returns_all_crossings() -> None:
+    response = client.get(
+        "/sol/crepusculos",
+        params={"latitude": -34.6, "longitude": -58.4, "date": "2024-03-20"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    for key in (
+        "astronomical",
+        "nautical",
+        "civil",
+        "blue_hour_limit",
+        "horizon",
+        "golden_hour_limit",
+    ):
+        assert body[key]["rise"] is not None
+        assert body[key]["set"] is not None
+    assert body["civil"]["altitude_deg"] == -6.0
+    assert body["civil"]["rise"] < body["horizon"]["rise"]
+
+
+def test_estaciones_returns_four_events_in_order() -> None:
+    response = client.get("/sol/estaciones", params={"year": 2024})
+    assert response.status_code == 200
+    body = response.json()
+    events = [
+        body["march_equinox"],
+        body["june_solstice"],
+        body["september_equinox"],
+        body["december_solstice"],
+    ]
+    assert events == sorted(events)
+    assert body["march_equinox"].startswith("2024-03-20")
+
+
+def test_estaciones_rejects_year_outside_range() -> None:
+    assert client.get("/sol/estaciones", params={"year": 500}).status_code == 422
+
+
+def test_panel_returns_orientation_and_curve() -> None:
+    response = client.get(
+        "/sol/panel", params={"latitude": -34.6, "longitude": -58.4, "year": 2024}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["azimuth_deg"] == 0.0
+    assert 0 < body["annual_tilt_deg"] < 60
+    assert len(body["curve"]) == 19
+    assert body["annual_kwh_per_m2"] > body["horizontal_kwh_per_m2"]

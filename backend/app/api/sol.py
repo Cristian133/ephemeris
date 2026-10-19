@@ -6,14 +6,19 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.schemas.sol import (
+    AltitudeCrossing,
     AnnualSunResponse,
     DailySun,
     DailySunResponse,
     IrradianceResponse,
     IrradianceSample,
+    PanelResponse,
+    SeasonsResponse,
     SolarNoonResponse,
     SunPosition,
+    TiltEnergy,
     TrajectoryResponse,
+    TwilightResponse,
 )
 from app.solar.events import (
     daily_irradiation,
@@ -22,6 +27,9 @@ from app.solar.events import (
     sunrise_sunset,
     sunrise_sunset_year,
 )
+from app.solar.panel import optimal_panel_orientation
+from app.solar.seasons import MAX_YEAR, MIN_YEAR, seasons
+from app.solar.twilight import twilight
 
 router = APIRouter()
 
@@ -165,4 +173,58 @@ def irradiancia(
         date=date,
         energy_wh_per_m2=result.energy_wh_per_m2,
         samples=samples,
+    )
+
+
+@router.get("/crepusculos", response_model=TwilightResponse)
+def crepusculos(latitude: Latitude, longitude: Longitude, date: DateParam) -> TwilightResponse:
+    """Crepúsculos (civil, náutico, astronómico) y límites de las horas azul
+    y dorada para una ubicación y fecha dadas."""
+    result = twilight(date, latitude, longitude)
+    return TwilightResponse(
+        latitude=latitude,
+        longitude=longitude,
+        date=date,
+        astronomical=AltitudeCrossing(**vars(result.astronomical)),
+        nautical=AltitudeCrossing(**vars(result.nautical)),
+        civil=AltitudeCrossing(**vars(result.civil)),
+        blue_hour_limit=AltitudeCrossing(**vars(result.blue_hour_limit)),
+        horizon=AltitudeCrossing(**vars(result.horizon)),
+        golden_hour_limit=AltitudeCrossing(**vars(result.golden_hour_limit)),
+    )
+
+
+@router.get("/estaciones", response_model=SeasonsResponse)
+def estaciones(
+    year: Annotated[
+        int, Query(ge=MIN_YEAR, le=MAX_YEAR, description="Año calendario (gregoriano)")
+    ],
+) -> SeasonsResponse:
+    """Equinoccios y solsticios del año (Meeus cap. 27). No depende de la
+    ubicación."""
+    result = seasons(year)
+    return SeasonsResponse(year=year, **vars(result))
+
+
+@router.get("/panel", response_model=PanelResponse)
+def panel(
+    latitude: Latitude,
+    longitude: Longitude,
+    year: Annotated[int, Query(ge=1, le=9999, description="Año calendario (gregoriano)")],
+) -> PanelResponse:
+    """Orientación e inclinación óptimas de un panel solar fijo: la que más
+    energía acumula en el año (y en cada solsticio), en cielo despejado.
+    Modelo simplificado (ver `app.solar.panel`)."""
+    result = optimal_panel_orientation(year, latitude, longitude)
+    return PanelResponse(
+        latitude=latitude,
+        longitude=longitude,
+        year=year,
+        azimuth_deg=result.azimuth_deg,
+        annual_tilt_deg=result.annual_tilt_deg,
+        winter_tilt_deg=result.winter_tilt_deg,
+        summer_tilt_deg=result.summer_tilt_deg,
+        annual_kwh_per_m2=result.annual_kwh_per_m2,
+        horizontal_kwh_per_m2=result.horizontal_kwh_per_m2,
+        curve=[TiltEnergy(tilt_deg=t, annual_kwh_per_m2=e) for t, e in result.curve],
     )

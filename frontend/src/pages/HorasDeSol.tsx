@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError, getAnnualSun, getDailySun } from '../api/client'
 import type { AnnualSunResponse, DailySunResponse } from '../api/types'
 import { useLocation } from '../context/LocationContext'
 import { useDate } from '../context/DateContext'
 import { formatTime } from '../utils/date'
+import { ExportButtons } from '../components/ExportButtons'
 import { AnnualDayLengthChart } from '../components/charts/AnnualDayLengthChart'
 
 /** Punto 1 (horas de sol de un día) + punto 2 (evolución anual). */
@@ -17,6 +18,7 @@ export default function HorasDeSol() {
 
   const [annual, setAnnual] = useState<AnnualSunResponse | null>(null)
   const [annualError, setAnnualError] = useState<string | null>(null)
+  const chartRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!location) return
@@ -116,7 +118,33 @@ export default function HorasDeSol() {
         </label>
 
         {annualError && <p style={{ color: 'var(--series-2)' }}>{annualError}</p>}
-        {annual && <AnnualDayLengthChart data={annual} />}
+        {annual && (
+          <>
+            <div ref={chartRef}>
+              <AnnualDayLengthChart data={annual} />
+            </div>
+            <ExportButtons
+              filename={`horas-de-sol-${annual.year}`}
+              chartRef={chartRef}
+              getCsvRows={() => [
+                [
+                  'fecha',
+                  `orto (${location.timezone})`,
+                  `mediodia_solar (${location.timezone})`,
+                  `ocaso (${location.timezone})`,
+                  'horas_de_sol',
+                ],
+                ...annual.days.map((d) => [
+                  d.date,
+                  d.sunrise ? formatTime(d.sunrise, location.timezone) : null,
+                  formatTime(d.transit, location.timezone),
+                  d.sunset ? formatTime(d.sunset, location.timezone) : null,
+                  d.day_length_hours != null ? Number(d.day_length_hours.toFixed(3)) : null,
+                ]),
+              ]}
+            />
+          </>
+        )}
       </section>
     </div>
   )

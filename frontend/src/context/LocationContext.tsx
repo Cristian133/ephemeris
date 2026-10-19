@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { readLocationFromUrl } from '../utils/urlState'
 
 export interface SelectedLocation {
   displayName: string
@@ -36,9 +37,12 @@ function readStoredLocation(): SelectedLocation | null {
 /** Ubicación elegida por el usuario, compartida entre todas las páginas y
  * persistida en localStorage (conveniencia de este navegador, no un
  * backend — ver skill de capacidades de artifacts si algún día hiciera
- * falta compartir entre dispositivos). */
+ * falta compartir entre dispositivos). Una ubicación en la URL (enlace
+ * compartido) tiene prioridad sobre la guardada. */
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const [location, setLocationState] = useState<SelectedLocation | null>(readStoredLocation)
+  const [location, setLocationState] = useState<SelectedLocation | null>(
+    () => readLocationFromUrl() ?? readStoredLocation(),
+  )
 
   useEffect(() => {
     if (!location) return

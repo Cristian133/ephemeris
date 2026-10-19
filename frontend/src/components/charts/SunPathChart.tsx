@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TrajectoryResponse } from '../../api/types'
+import type { SunPosition, TrajectoryResponse } from '../../api/types'
 import { compassLabel } from '../../utils/compass'
 import { formatTime } from '../../utils/date'
 
@@ -13,6 +13,16 @@ const CARDINAL_POINTS = [
   { deg: 180, label: 'S' },
   { deg: 270, label: 'O' },
 ]
+
+const LEGEND_ROW_HEIGHT = 18
+
+/** Trayectoria de otra fecha, dibujada de fondo para comparar con la del
+ * día elegido (ej. los solsticios y el equinoccio). */
+export interface SunPathOverlay {
+  label: string
+  color: string
+  samples: SunPosition[]
+}
 
 interface VisibleSample {
   index: number
@@ -32,11 +42,42 @@ function toPoint(azimuthDeg: number, altitudeDeg: number): { x: number; y: numbe
   return { x: CENTER + r * Math.sin(rad), y: CENTER - r * Math.cos(rad) }
 }
 
+/** Puntos (en el plano del gráfico) de cada tramo contiguo con el sol
+ * sobre el horizonte. */
+function visibleSegments(samples: SunPosition[]): string[] {
+  const segments: string[][] = []
+  let current: string[] = []
+  let previousIndex = -2
+  samples.forEach((s, index) => {
+    if (s.apparent_altitude <= 0) return
+    if (index !== previousIndex + 1 && current.length > 0) {
+      segments.push(current)
+      current = []
+    }
+    const p = toPoint(s.azimuth, s.apparent_altitude)
+    current.push(`${p.x},${p.y}`)
+    previousIndex = index
+  })
+  if (current.length > 0) segments.push(current)
+  return segments.map((points) => points.join(' '))
+}
+
 /** Trayectoria del Sol a lo largo de un día (punto 3), como gráfico polar:
  * altitud aparente (la que realmente se ve) como radio, azimut como
- * ángulo. Solo se dibuja el tramo con el sol sobre el horizonte. */
-export function SunPathChart({ data, timezone }: { data: TrajectoryResponse; timezone: string }) {
+ * ángulo. Solo se dibuja el tramo con el sol sobre el horizonte. Con
+ * `overlays`, dibuja además esas trayectorias de fondo, con leyenda. */
+export function SunPathChart({
+  data,
+  timezone,
+  overlays = [],
+}: {
+  data: TrajectoryResponse
+  timezone: string
+  overlays?: SunPathOverlay[]
+}) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const legendHeight = overlays.length > 0 ? (overlays.length + 1) * LEGEND_ROW_HEIGHT + 8 : 0
+  const totalHeight = SIZE + legendHeight
 
   const visible: VisibleSample[] = data.samples
     .map((s, index) => ({ index, time: s.time, altitude: s.apparent_altitude, azimuth: s.azimuth }))
@@ -69,11 +110,18 @@ export function SunPathChart({ data, timezone }: { data: TrajectoryResponse; tim
   const hoveredPoint = hovered ? toPoint(hovered.azimuth, hovered.altitude) : null
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: `${SIZE}px`, aspectRatio: '1' }}>
+    <div
+      style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: `${SIZE}px`,
+        aspectRatio: `${SIZE} / ${totalHeight}`,
+      }}
+    >
       <svg
         width="100%"
         height="100%"
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        viewBox={`0 0 ${SIZE} ${totalHeight}`}
         role="img"
         aria-label="Trayectoria del sol a lo largo del día"
       >
@@ -122,6 +170,21 @@ export function SunPathChart({ data, timezone }: { data: TrajectoryResponse; tim
             </g>
           )
         })}
+
+        {overlays.flatMap((overlay) =>
+          visibleSegments(overlay.samples).map((points, si) => (
+            <polyline
+              key={`${overlay.label}-${si}`}
+              points={points}
+              fill="none"
+              stroke={overlay.color}
+              strokeWidth={1.75}
+              strokeDasharray="5 3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )),
+        )}
 
         {segments.map((segment, si) => (
           <polyline
@@ -191,6 +254,29 @@ export function SunPathChart({ data, timezone }: { data: TrajectoryResponse; tim
           )
         })}
 
+        {overlays.length > 0 &&
+          [{ label: 'Fecha elegida', color: 'var(--series-1)', dashed: false }, ...overlays.map((o) => ({ ...o, dashed: true }))].map(
+            (entry, i) => {
+              const y = SIZE + 8 + i * LEGEND_ROW_HEIGHT
+              return (
+                <g key={entry.label}>
+                  <line
+                    x1={8}
+                    y1={y}
+                    x2={32}
+                    y2={y}
+                    stroke={entry.color}
+                    strokeWidth={2}
+                    strokeDasharray={entry.dashed ? '5 3' : undefined}
+                  />
+                  <text x={40} y={y} dominantBaseline="middle" fontSize={11} fill="var(--text-secondary)">
+                    {entry.label}
+                  </text>
+                </g>
+              )
+            },
+          )}
+
         {hoveredPoint && (
           <circle
             cx={hoveredPoint.x}
@@ -208,7 +294,7 @@ export function SunPathChart({ data, timezone }: { data: TrajectoryResponse; tim
           style={{
             position: 'absolute',
             left: `${(hoveredPoint.x / SIZE) * 100}%`,
-            top: `${(hoveredPoint.y / SIZE) * 100}%`,
+            top: `${(hoveredPoint.y / totalHeight) * 100}%`,
             transform: 'translate(-50%, calc(-100% - 0.75rem))',
             background: 'var(--surface-1)',
             border: '1px solid var(--border)',
