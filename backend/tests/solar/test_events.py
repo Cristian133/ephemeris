@@ -8,6 +8,7 @@ from app.solar.events import (
     STANDARD_ALTITUDE_SUN,
     _hour_angle_at_altitude,
     daily_irradiation,
+    local_day_start_jd,
     solar_noon,
     solar_transit,
     sun_trajectory,
@@ -18,7 +19,12 @@ from app.solar.horizontal import altitude as horizontal_altitude
 from app.solar.horizontal import azimuth as horizontal_azimuth
 from app.solar.horizontal import hour_angle, local_sidereal_time
 from app.solar.refraction import apparent_altitude as refracted_altitude
-from app.solar.time import julian_century, julian_day, mean_sidereal_time
+from app.solar.time import (
+    apparent_sidereal_time,
+    datetime_from_julian_day,
+    julian_century_tt,
+    julian_day,
+)
 
 # --- Identidades exactas de las funciones auxiliares -----------------------
 # El día-largo clásico: cos(H0) = -tan(latitud) * tan(declinación), con
@@ -174,9 +180,12 @@ def test_sun_trajectory_covers_24h_at_requested_resolution() -> None:
     assert len(result.altitude) == 96
     assert len(result.apparent_altitude) == 96
     assert len(result.azimuth) == 96
-    assert result.times[0] == datetime(2024, 6, 1, 0, 0, tzinfo=UTC)
-    # El último instante es 15' antes de la medianoche siguiente (24h/96).
-    assert result.times[-1] == datetime(2024, 6, 1, 23, 45, tzinfo=UTC)
+    # Parte de la medianoche media local (0h UT + 58.4/15 h) y el último
+    # instante es 15' antes de la siguiente (24h/96).
+    start = datetime_from_julian_day(local_day_start_jd(day, -58.4))
+    assert result.times[0] == start
+    assert result.times[0] == datetime(2024, 6, 1, 3, 53, 36, tzinfo=UTC)
+    assert result.times[-1] == start + timedelta(hours=23, minutes=45)
 
 
 def test_sun_trajectory_matches_manual_composition_of_public_functions() -> None:
@@ -188,10 +197,10 @@ def test_sun_trajectory_matches_manual_composition_of_public_functions() -> None
 
     for i, time in enumerate(result.times):
         jd = julian_day(time)
-        t = julian_century(jd)
+        t = julian_century_tt(jd)
         alpha = right_ascension(t)
         delta = declination(t)
-        lst = local_sidereal_time(mean_sidereal_time(jd), lon)
+        lst = local_sidereal_time(apparent_sidereal_time(jd), lon)
         h = hour_angle(lst, alpha)
 
         assert result.altitude[i] == pytest.approx(horizontal_altitude(lat, delta, h))
@@ -294,3 +303,92 @@ def test_daily_irradiation_zero_during_polar_night() -> None:
     result = daily_irradiation(date(2024, 12, 21), 80.0, 0.0, num_samples=48)
     assert all(p == 0.0 for p in result.power_w_per_m2)
     assert result.energy_wh_per_m2 == 0.0
+
+
+# --- Día solar local (longitudes lejanas a Greenwich) ----------------------
+
+
+def test_local_day_start_is_local_mean_midnight() -> None:
+    assert datetime_from_julian_day(local_day_start_jd(date(2024, 6, 1), 0.0)) == datetime(
+        2024, 6, 1, tzinfo=UTC
+    )
+    # 90° al este: la medianoche media local es 6h antes de 0h UT.
+    assert datetime_from_julian_day(local_day_start_jd(date(2024, 6, 1), 90.0)) == datetime(
+        2024, 5, 31, 18, tzinfo=UTC
+    )
+
+
+@pytest.mark.parametrize("longitude", [-170.0, -58.4, 0.0, 100.0, 151.2, 179.0])
+def test_daily_irradiation_energy_does_not_depend_on_longitude(longitude: float) -> None:
+    """La energía de un día solar depende de la latitud y la fecha, no de
+    la longitud. Con ventanas de 24h desde 0h UT, el amanecer a longitudes
+    al este de ~+90° quedaba fuera de la ventana y la energía se
+    subestimaba mucho."""
+    reference = daily_irradiation(date(2024, 3, 20), -34.0, 0.0).energy_wh_per_m2
+    result = daily_irradiation(date(2024, 3, 20), -34.0, longitude).energy_wh_per_m2
+    assert result == pytest.approx(reference, rel=0.01)
+
+
+def test_sun_trajectory_includes_the_whole_daylight_at_far_east_longitudes() -> None:
+    # Sídney: el orto cae el día UT anterior; la trayectoria del día local
+    # debe empezar de noche, subir por encima del horizonte y terminar de noche.
+    result = sun_trajectory(date(2024, 1, 15), -33.9, 151.2)
+    assert result.altitude[0] < 0
+    assert max(result.altitude) > 60
+    assert result.altitude[-1] < 0
+
+
+def test_sun_trajectory_peak_matches_transit_at_far_east_longitude() -> None:
+    day, lat, lon = date(2024, 1, 15), -33.9, 151.2
+    result = sun_trajectory(day, lat, lon, num_samples=288)
+    peak = result.times[max(range(288), key=lambda i: result.altitude[i])]
+    assert abs((peak - solar_transit(day, lon)).total_seconds()) <= 24 * 3600 / 288
+
+
+# --- Refracción configurable ----------------------------------------------
+
+
+def test_solar_noon_refraction_follows_pressure_and_temperature() -> None:
+    day, lat, lon = date(2024, 12, 21), 65.0, 0.0  # sol bajo: la refracción se nota
+    standard = solar_noon(day, lat, lon)
+    cold_high_pressure = solar_noon(day, lat, lon, pressure_mbar=1040.0, temperature_c=-20.0)
+    thin_air = solar_noon(day, lat, lon, pressure_mbar=700.0, temperature_c=10.0)
+    assert cold_high_pressure.apparent_altitude_deg > standard.apparent_altitude_deg
+    assert thin_air.apparent_altitude_deg < standard.apparent_altitude_deg
+    assert cold_high_pressure.altitude_deg == standard.altitude_deg  # la verdadera no cambia
+
+
+def test_sun_trajectory_refraction_follows_pressure_and_temperature() -> None:
+    standard = sun_trajectory(date(2024, 6, 1), 40.0, 0.0)
+    thin_air = sun_trajectory(date(2024, 6, 1), 40.0, 0.0, pressure_mbar=700.0)
+    assert thin_air.altitude == standard.altitude
+    assert thin_air.apparent_altitude != standard.apparent_altitude
+
+
+# --- Irradiancia: componentes ---------------------------------------------
+
+
+def test_daily_irradiation_components_add_up() -> None:
+    result = daily_irradiation(date(2024, 6, 21), 40.0, -3.7)
+    for total, direct, diffuse in zip(
+        result.power_w_per_m2, result.direct_w_per_m2, result.diffuse_w_per_m2, strict=True
+    ):
+        assert total == pytest.approx(direct + diffuse)
+    assert result.energy_wh_per_m2 == pytest.approx(
+        result.direct_energy_wh_per_m2 + result.diffuse_energy_wh_per_m2, rel=1e-9
+    )
+    assert 0.05 < result.diffuse_energy_wh_per_m2 / result.energy_wh_per_m2 < 0.30
+
+
+def test_daily_irradiation_clear_sky_summer_energy_is_plausible() -> None:
+    # Madrid en el solsticio de verano: ~8-9 kWh/m² por día en cielo despejado.
+    result = daily_irradiation(date(2024, 6, 21), 40.4, -3.7)
+    assert 7000 < result.energy_wh_per_m2 < 10000
+
+
+def test_daily_irradiation_elevation_and_turbidity_change_energy() -> None:
+    base = daily_irradiation(date(2024, 6, 21), 40.0, 0.0).energy_wh_per_m2
+    mountain = daily_irradiation(date(2024, 6, 21), 40.0, 0.0, elevation_m=3000.0)
+    hazy = daily_irradiation(date(2024, 6, 21), 40.0, 0.0, linke_turbidity=6.0)
+    assert mountain.energy_wh_per_m2 > base
+    assert hazy.energy_wh_per_m2 < base

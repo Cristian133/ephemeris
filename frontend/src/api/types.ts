@@ -32,6 +32,8 @@ export interface TrajectoryResponse {
   latitude: number
   longitude: number
   date: string
+  pressure_mbar: number
+  temperature_c: number
   samples: SunPosition[]
 }
 
@@ -39,6 +41,8 @@ export interface SolarNoonResponse {
   latitude: number
   longitude: number
   date: string
+  pressure_mbar: number
+  temperature_c: number
   transit: string
   altitude_deg: number
   apparent_altitude_deg: number
@@ -47,14 +51,20 @@ export interface SolarNoonResponse {
 
 export interface IrradianceSample {
   time: string
-  power_w_per_m2: number
+  power_w_per_m2: number // global horizontal = directa + difusa
+  direct_w_per_m2: number
+  diffuse_w_per_m2: number
 }
 
 export interface IrradianceResponse {
   latitude: number
   longitude: number
   date: string
+  elevation_m: number
+  linke_turbidity: number
   energy_wh_per_m2: number
+  direct_energy_wh_per_m2: number
+  diffuse_energy_wh_per_m2: number
   samples: IrradianceSample[]
 }
 
@@ -94,6 +104,9 @@ export interface PanelResponse {
   latitude: number
   longitude: number
   year: number
+  elevation_m: number
+  linke_turbidity: number
+  albedo: number
   azimuth_deg: number
   annual_tilt_deg: number
   winter_tilt_deg: number

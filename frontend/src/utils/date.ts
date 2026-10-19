@@ -15,7 +15,11 @@ export function shiftDateIso(iso: string, days: number): string {
 }
 
 export function isValidDateIso(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  // Date.parse acepta dias inexistentes como 2024-02-31 (los desborda al
+  // mes siguiente): se compara el ida y vuelta para rechazarlos.
+  const parsed = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
 }
 
 /** Formatea un instante (ISO, en UT) en la hora local del lugar

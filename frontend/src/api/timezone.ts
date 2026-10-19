@@ -13,7 +13,11 @@
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast'
 
-export async function resolveTimezone(latitude: number, longitude: number): Promise<string> {
+export async function resolveTimezone(
+  latitude: number,
+  longitude: number,
+  signal?: AbortSignal,
+): Promise<string> {
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
@@ -21,9 +25,9 @@ export async function resolveTimezone(latitude: number, longitude: number): Prom
     forecast_days: '1',
     daily: 'sunrise',
   })
-  const response = await fetch(`${OPEN_METEO_URL}?${params}`)
+  const response = await fetch(`${OPEN_METEO_URL}?${params}`, { signal })
   if (!response.ok) {
-    throw new Error(`Open-Meteo: ${response.statusText}`)
+    throw new Error(`Open-Meteo: ${response.status} ${response.statusText}`.trim())
   }
   const data = (await response.json()) as { timezone?: string }
   if (!data.timezone) {

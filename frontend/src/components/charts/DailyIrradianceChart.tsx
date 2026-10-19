@@ -15,6 +15,8 @@ import { formatTime } from '../../utils/date'
 interface ChartPoint {
   time: string
   power: number
+  direct: number
+  diffuse: number
 }
 
 function CustomTooltip({
@@ -41,13 +43,20 @@ function CustomTooltip({
       <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
         {point.power.toFixed(0)} W/m²
       </div>
+      <div style={{ color: 'var(--series-1)', fontSize: '0.8rem' }}>
+        Directa {point.direct.toFixed(0)} W/m²
+      </div>
+      <div style={{ color: 'var(--series-3)', fontSize: '0.8rem' }}>
+        Difusa {point.diffuse.toFixed(0)} W/m²
+      </div>
     </div>
   )
 }
 
-/** Irradiancia solar (cielo despejado) a lo largo de un día (punto 5).
- * Serie única: sin leyenda. Marca el pico de potencia (mediodía solar)
- * como única etiqueta directa. */
+/** Irradiancia solar (cielo despejado) a lo largo de un día (punto 5):
+ * área apilada de la componente directa y la difusa, con la global como
+ * borde superior. Las dos series se rotulan con una leyenda mínima y el
+ * pico de la global se marca directamente. */
 export function DailyIrradianceChart({
   data,
   timezone,
@@ -55,10 +64,16 @@ export function DailyIrradianceChart({
   data: IrradianceResponse
   timezone: string
 }) {
-  const points: ChartPoint[] = data.samples.map((s) => ({ time: s.time, power: s.power_w_per_m2 }))
+  const points: ChartPoint[] = data.samples.map((s) => ({
+    time: s.time,
+    power: s.power_w_per_m2,
+    direct: s.direct_w_per_m2,
+    diffuse: s.diffuse_w_per_m2,
+  }))
   const peak = points.reduce((max, p) => (p.power > max.power ? p : max), points[0])
 
   return (
+    <>
     <ResponsiveContainer width="100%" height={320}>
       <AreaChart data={points} margin={{ top: 16, right: 16, bottom: 0, left: 0 }}>
         <CartesianGrid stroke="var(--gridline)" vertical={false} />
@@ -85,14 +100,24 @@ export function DailyIrradianceChart({
         <Tooltip content={(props) => <CustomTooltip {...props} timezone={timezone} />} />
         <Area
           type="monotone"
-          dataKey="power"
+          dataKey="direct"
+          stackId="irradiance"
           stroke="var(--series-1)"
           strokeWidth={2}
-          strokeLinecap="round"
           fill="var(--series-1)"
-          fillOpacity={0.1}
+          fillOpacity={0.15}
           dot={false}
-          activeDot={{ r: 4, fill: 'var(--series-1)', stroke: 'var(--surface-1)', strokeWidth: 2 }}
+          isAnimationActive={false}
+        />
+        <Area
+          type="monotone"
+          dataKey="diffuse"
+          stackId="irradiance"
+          stroke="var(--series-3)"
+          strokeWidth={2}
+          fill="var(--series-3)"
+          fillOpacity={0.15}
+          dot={false}
           isAnimationActive={false}
         />
         {peak.power > 0 && (
@@ -100,7 +125,7 @@ export function DailyIrradianceChart({
             x={peak.time}
             y={peak.power}
             r={4}
-            fill="var(--series-1)"
+            fill="var(--text-secondary)"
             stroke="var(--surface-1)"
             strokeWidth={2}
             label={{
@@ -113,5 +138,10 @@ export function DailyIrradianceChart({
         )}
       </AreaChart>
     </ResponsiveContainer>
+    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+      <span style={{ color: 'var(--series-1)' }}>Directa</span>
+      <span style={{ color: 'var(--series-3)' }}>Difusa</span>
+    </div>
+    </>
   )
 }

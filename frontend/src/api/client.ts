@@ -63,11 +63,18 @@ export function getSolarNoon({ latitude, longitude, date }: LocationDate): Promi
   return get('/sol/mediodia', { latitude, longitude, date })
 }
 
+/** Parámetros del modelo de cielo despejado (ver `app/solar/irradiance.py`). */
+export type SkyModel = {
+  elevation_m: number
+  linke_turbidity: number
+}
+
 export function getIrradiance(
   { latitude, longitude, date }: LocationDate,
+  sky: SkyModel,
   numSamples = 96,
 ): Promise<IrradianceResponse> {
-  return get('/sol/irradiancia', { latitude, longitude, date, num_samples: numSamples })
+  return get('/sol/irradiancia', { latitude, longitude, date, num_samples: numSamples, ...sky })
 }
 
 export function getTwilight({ latitude, longitude, date }: LocationDate): Promise<TwilightResponse> {
@@ -78,10 +85,13 @@ export function getSeasons(year: number): Promise<SeasonsResponse> {
   return get('/sol/estaciones', { year })
 }
 
-export function getPanel(params: {
-  latitude: number
-  longitude: number
-  year: number
-}): Promise<PanelResponse> {
+export function getPanel(
+  params: {
+    latitude: number
+    longitude: number
+    year: number
+    albedo: number
+  } & SkyModel,
+): Promise<PanelResponse> {
   return get('/sol/panel', params)
 }

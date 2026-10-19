@@ -77,8 +77,10 @@ def test_trayectoria_returns_default_96_samples_covering_the_day() -> None:
     assert body["longitude"] == -58.4
     assert body["date"] == "2024-06-01"
     assert len(body["samples"]) == 96
-    assert body["samples"][0]["time"] == "2024-06-01T00:00:00Z"
-    assert body["samples"][-1]["time"] == "2024-06-01T23:45:00Z"
+    # El día solar local arranca en la medianoche media local: 0h UT más
+    # 58.4/15 h (longitud 58.4° oeste), y dura 24h menos un paso de 15'.
+    assert body["samples"][0]["time"] == "2024-06-01T03:53:36Z"
+    assert body["samples"][-1]["time"] == "2024-06-02T03:38:36Z"
     for sample in body["samples"]:
         assert -90 <= sample["altitude"] <= 90
         assert sample["apparent_altitude"] >= sample["altitude"]  # la refracción siempre "levanta"
@@ -306,3 +308,117 @@ def test_panel_returns_orientation_and_curve() -> None:
     assert 0 < body["annual_tilt_deg"] < 60
     assert len(body["curve"]) == 19
     assert body["annual_kwh_per_m2"] > body["horizontal_kwh_per_m2"]
+
+
+# --- Parámetros nuevos: refracción, modelo de cielo, caché, CORS -----------
+
+
+def test_mediodia_echoes_and_uses_atmospheric_conditions() -> None:
+    base = {"latitude": 65.0, "longitude": 0.0, "date": "2024-12-21"}
+    standard = client.get("/sol/mediodia", params=base).json()
+    cold = client.get(
+        "/sol/mediodia", params={**base, "pressure_mbar": 1040, "temperature_c": -20}
+    ).json()
+    assert standard["pressure_mbar"] == 1010
+    assert standard["temperature_c"] == 10
+    assert cold["pressure_mbar"] == 1040
+    assert cold["apparent_altitude_deg"] > standard["apparent_altitude_deg"]
+    assert cold["altitude_deg"] == standard["altitude_deg"]
+
+
+def test_trayectoria_accepts_atmospheric_conditions() -> None:
+    response = client.get(
+        "/sol/trayectoria",
+        params={
+            "latitude": 40.0,
+            "longitude": 0.0,
+            "date": "2024-06-01",
+            "pressure_mbar": 800,
+            "temperature_c": 20,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["pressure_mbar"] == 800
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "param", "value"),
+    [
+        ("/sol/mediodia", "pressure_mbar", 5000),
+        ("/sol/mediodia", "temperature_c", -200),
+        ("/sol/irradiancia", "linke_turbidity", 0.5),
+        ("/sol/irradiancia", "elevation_m", 20000),
+        ("/sol/panel", "albedo", 1.5),
+    ],
+)
+def test_model_parameters_are_range_checked(endpoint: str, param: str, value: float) -> None:
+    params = {"latitude": 0.0, "longitude": 0.0, "date": "2024-03-20", "year": 2024, param: value}
+    assert client.get(endpoint, params=params).status_code == 422
+
+
+def test_irradiancia_returns_components_and_echoes_model_parameters() -> None:
+    response = client.get(
+        "/sol/irradiancia",
+        params={
+            "latitude": 40.4,
+            "longitude": -3.7,
+            "date": "2024-06-21",
+            "elevation_m": 650,
+            "linke_turbidity": 3.5,
+        },
+    )
+    body = response.json()
+    assert body["elevation_m"] == 650
+    assert body["linke_turbidity"] == 3.5
+    assert body["energy_wh_per_m2"] == pytest.approx(
+        body["direct_energy_wh_per_m2"] + body["diffuse_energy_wh_per_m2"], rel=1e-6
+    )
+    for sample in body["samples"]:
+        assert sample["power_w_per_m2"] == pytest.approx(
+            sample["direct_w_per_m2"] + sample["diffuse_w_per_m2"]
+        )
+
+
+def test_irradiancia_energy_does_not_depend_on_longitude_through_the_api() -> None:
+    def energy(longitude: float) -> float:
+        params = {"latitude": -34.0, "longitude": longitude, "date": "2024-03-20"}
+        return client.get("/sol/irradiancia", params=params).json()["energy_wh_per_m2"]
+
+    assert energy(151.0) == pytest.approx(energy(-58.0), rel=0.01)
+
+
+def test_panel_echoes_model_parameters_and_albedo_matters() -> None:
+    base = {"latitude": 46.0, "longitude": 7.0, "year": 2024}
+    dark = client.get("/sol/panel", params={**base, "albedo": 0.0}).json()
+    snow = client.get("/sol/panel", params={**base, "albedo": 0.9}).json()
+    assert snow["albedo"] == 0.9
+    assert snow["annual_kwh_per_m2"] > dark["annual_kwh_per_m2"]
+
+
+def test_anual_and_panel_are_cached_for_the_same_location() -> None:
+    from app.api import sol
+
+    sol._annual_sun.cache_clear()
+    sol._panel_orientation.cache_clear()
+    params = {"latitude": -34.60001, "longitude": -58.4, "year": 2024}
+    client.get("/sol/anual", params=params)
+    client.get("/sol/anual", params={**params, "latitude": -34.60002})  # mismo a 4 decimales
+    client.get("/sol/panel", params=params)
+    client.get("/sol/panel", params=params)
+    assert sol._annual_sun.cache_info().hits == 1
+    assert sol._annual_sun.cache_info().misses == 1
+    assert sol._panel_orientation.cache_info().hits == 1
+
+
+def test_cors_allows_only_configured_origins() -> None:
+    allowed = client.get("/health", headers={"Origin": "http://localhost:5173"})
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
+    other = client.get("/health", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in other.headers
+
+
+def test_cors_origin_list_parsing() -> None:
+    from app.config import Settings
+
+    settings = Settings(cors_origins=" https://a.example , https://b.example,, ")
+    assert settings.cors_origin_list == ["https://a.example", "https://b.example"]
