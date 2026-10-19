@@ -33,3 +33,11 @@ repos:
         language: system
         files: ^backend/
         pass_filenames: false
+
+      # Lint del frontend: requiere `npm install` previo en frontend/.
+      - id: frontend-lint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|json)$
+        pass_filenames: false

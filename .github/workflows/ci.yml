@@ -59,5 +59,11 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Tests (vitest)
+        run: npm test
+
       - name: Build (type-check + vite build)
         run: npm run build

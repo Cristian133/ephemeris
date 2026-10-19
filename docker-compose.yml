@@ -1,11 +1,16 @@
-# Etapa 1: sin base de datos ni cache — el motor de cálculo es puro/stateless
-# (ver docs/plan_tecnico.md, decisión de infra). Se suman servicios acá si
-# una etapa futura los requiere (ej. cache de datos meteorológicos).
+# Etapa 1: sin base de datos ni servicio de cache — el motor de cálculo es
+# puro/stateless y la API solo cachea en memoria los cálculos anuales (ver
+# docs/plan_tecnico.md, decisión de infra). Se suman servicios acá si una
+# etapa futura los requiere (ej. cache de datos meteorológicos).
 services:
   backend:
     build: ./backend
     ports:
       - "8000:8000"
+    environment:
+      # Orígenes permitidos por CORS (separados por coma). Por defecto, el
+      # frontend de desarrollo; en producción, el dominio real.
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

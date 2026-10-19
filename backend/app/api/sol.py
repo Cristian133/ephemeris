@@ -1,6 +1,7 @@
 """Endpoints de `/sol` (ver docs/plan_tecnico.md, sección 5)."""
 
 from datetime import date as date_type
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -21,13 +22,15 @@ from app.schemas.sol import (
     TwilightResponse,
 )
 from app.solar.events import (
+    SunYear,
     daily_irradiation,
     solar_noon,
     sun_trajectory,
     sunrise_sunset,
     sunrise_sunset_year,
 )
-from app.solar.panel import optimal_panel_orientation
+from app.solar.irradiance import DEFAULT_LINKE_TURBIDITY
+from app.solar.panel import DEFAULT_ALBEDO, PanelOrientation, optimal_panel_orientation
 from app.solar.seasons import MAX_YEAR, MIN_YEAR, seasons
 from app.solar.twilight import twilight
 
@@ -41,7 +44,82 @@ Longitude = Annotated[
     float,
     Query(ge=-180, le=180, description="Longitud del observador, en grados (positiva al este)"),
 ]
-DateParam = Annotated[date_type, Query(description="Fecha (UTC)")]
+DateParam = Annotated[
+    date_type,
+    Query(
+        description=(
+            "Fecha del día solar local del observador (YYYY-MM-DD): el día que va de una "
+            "medianoche media local a la siguiente, no el día UTC"
+        )
+    ),
+]
+Pressure = Annotated[
+    float,
+    Query(
+        ge=300,
+        le=1100,
+        description="Presión atmosférica en mbar, para la refracción (estándar: 1010)",
+    ),
+]
+Temperature = Annotated[
+    float,
+    Query(
+        ge=-80,
+        le=60,
+        description="Temperatura del aire en °C, para la refracción (estándar: 10)",
+    ),
+]
+Elevation = Annotated[
+    float,
+    Query(
+        ge=-500,
+        le=9000,
+        description="Altitud del lugar sobre el nivel del mar, en metros",
+    ),
+]
+LinkeTurbidity = Annotated[
+    float,
+    Query(
+        ge=1,
+        le=8,
+        description=(
+            "Factor de turbidez de Linke (1 = aire limpio y seco; 2-5 típico; "
+            "más en ciudades e industria)"
+        ),
+    ),
+]
+Albedo = Annotated[
+    float,
+    Query(ge=0, le=1, description="Reflectividad del suelo (pasto ~0.2, nieve fresca ~0.8)"),
+]
+
+
+# Los cálculos de un año completo son puros y deterministas, así que se
+# cachean por (ubicación, parámetros). La ubicación se redondea a 4
+# decimales (~11 m): evita que coordenadas casi idénticas llenen el cache
+# sin cambiar el resultado de forma apreciable.
+_LOCATION_DECIMALS = 4
+
+
+@lru_cache(maxsize=128)
+def _annual_sun(year: int, latitude: float, longitude: float) -> SunYear:
+    return sunrise_sunset_year(year, latitude, longitude)
+
+
+@lru_cache(maxsize=128)
+def _panel_orientation(
+    year: int,
+    latitude: float,
+    longitude: float,
+    elevation_m: float,
+    linke_turbidity: float,
+    albedo: float,
+) -> PanelOrientation:
+    return optimal_panel_orientation(
+        year, latitude, longitude, elevation_m, linke_turbidity, albedo
+    )
+
+
 NumSamples = Annotated[
     int,
     Query(
@@ -61,7 +139,9 @@ def anual(
     """Evolución anual de las horas de sol (punto 2) para una ubicación
     dada — orto, tránsito, ocaso y duración del día para cada día del año.
     """
-    result = sunrise_sunset_year(year, latitude, longitude)
+    result = _annual_sun(
+        year, round(latitude, _LOCATION_DECIMALS), round(longitude, _LOCATION_DECIMALS)
+    )
 
     days = [
         DailySun(
@@ -110,14 +190,22 @@ def dia(latitude: Latitude, longitude: Longitude, date: DateParam) -> DailySunRe
 
 
 @router.get("/mediodia", response_model=SolarNoonResponse)
-def mediodia(latitude: Latitude, longitude: Longitude, date: DateParam) -> SolarNoonResponse:
+def mediodia(
+    latitude: Latitude,
+    longitude: Longitude,
+    date: DateParam,
+    pressure_mbar: Pressure = 1010.0,
+    temperature_c: Temperature = 10.0,
+) -> SolarNoonResponse:
     """Mediodía solar e inclinación del Sol en ese instante (punto 4):
     altitud máxima del día y azimut (0°=Norte o 180°=Sur)."""
-    result = solar_noon(date, latitude, longitude)
+    result = solar_noon(date, latitude, longitude, pressure_mbar, temperature_c)
     return SolarNoonResponse(
         latitude=latitude,
         longitude=longitude,
         date=date,
+        pressure_mbar=pressure_mbar,
+        temperature_c=temperature_c,
         transit=result.transit,
         altitude_deg=result.altitude_deg,
         apparent_altitude_deg=result.apparent_altitude_deg,
@@ -131,12 +219,15 @@ def trayectoria(
     longitude: Longitude,
     date: DateParam,
     num_samples: NumSamples = 96,
+    pressure_mbar: Pressure = 1010.0,
+    temperature_c: Temperature = 10.0,
 ) -> TrajectoryResponse:
     """Trayectoria del Sol (altitud/azimut) a lo largo de un día (punto 3),
-    para un gráfico polar. Incluye las 24h del día, no solo las horas de
-    luz — el cliente filtra por altitud si solo quiere el tramo diurno.
+    para un gráfico polar. Incluye las 24h del día solar local (desde su
+    medianoche media), no solo las horas de luz — el cliente filtra por
+    altitud si solo quiere el tramo diurno.
     """
-    result = sun_trajectory(date, latitude, longitude, num_samples)
+    result = sun_trajectory(date, latitude, longitude, num_samples, pressure_mbar, temperature_c)
 
     samples = [
         SunPosition(time=time, altitude=alt, apparent_altitude=apparent_alt, azimuth=az)
@@ -145,7 +236,14 @@ def trayectoria(
         )
     ]
 
-    return TrajectoryResponse(latitude=latitude, longitude=longitude, date=date, samples=samples)
+    return TrajectoryResponse(
+        latitude=latitude,
+        longitude=longitude,
+        date=date,
+        pressure_mbar=pressure_mbar,
+        temperature_c=temperature_c,
+        samples=samples,
+    )
 
 
 @router.get("/irradiancia", response_model=IrradianceResponse)
@@ -154,24 +252,39 @@ def irradiancia(
     longitude: Longitude,
     date: DateParam,
     num_samples: NumSamples = 96,
+    elevation_m: Elevation = 0.0,
+    linke_turbidity: LinkeTurbidity = DEFAULT_LINKE_TURBIDITY,
 ) -> IrradianceResponse:
     """Irradiancia solar en cielo despejado a lo largo de un día (punto 5)
-    y la energía total recibida por m² en el día. Modelo teórico
-    simplificado (ver `app.solar.irradiance`): no tiene en cuenta nubosidad
-    real ni componente difusa.
+    y la energía total recibida por m² de superficie horizontal en el día,
+    con el desglose en componente directa y difusa. Modelo de cielo
+    despejado (ver `app.solar.irradiance`): no tiene en cuenta nubosidad
+    real.
     """
-    result = daily_irradiation(date, latitude, longitude, num_samples)
+    result = daily_irradiation(date, latitude, longitude, num_samples, elevation_m, linke_turbidity)
 
     samples = [
-        IrradianceSample(time=time, power_w_per_m2=power)
-        for time, power in zip(result.times, result.power_w_per_m2, strict=True)
+        IrradianceSample(
+            time=time, power_w_per_m2=power, direct_w_per_m2=direct, diffuse_w_per_m2=diffuse
+        )
+        for time, power, direct, diffuse in zip(
+            result.times,
+            result.power_w_per_m2,
+            result.direct_w_per_m2,
+            result.diffuse_w_per_m2,
+            strict=True,
+        )
     ]
 
     return IrradianceResponse(
         latitude=latitude,
         longitude=longitude,
         date=date,
+        elevation_m=elevation_m,
+        linke_turbidity=linke_turbidity,
         energy_wh_per_m2=result.energy_wh_per_m2,
+        direct_energy_wh_per_m2=result.direct_energy_wh_per_m2,
+        diffuse_energy_wh_per_m2=result.diffuse_energy_wh_per_m2,
         samples=samples,
     )
 
@@ -211,15 +324,29 @@ def panel(
     latitude: Latitude,
     longitude: Longitude,
     year: Annotated[int, Query(ge=1, le=9999, description="Año calendario (gregoriano)")],
+    elevation_m: Elevation = 0.0,
+    linke_turbidity: LinkeTurbidity = DEFAULT_LINKE_TURBIDITY,
+    albedo: Albedo = DEFAULT_ALBEDO,
 ) -> PanelResponse:
     """Orientación e inclinación óptimas de un panel solar fijo: la que más
-    energía acumula en el año (y en cada solsticio), en cielo despejado.
-    Modelo simplificado (ver `app.solar.panel`)."""
-    result = optimal_panel_orientation(year, latitude, longitude)
+    energía acumula en el año (y en cada solsticio), en cielo despejado,
+    sumando radiación directa, difusa y reflejada por el suelo. Modelo
+    simplificado (ver `app.solar.panel`)."""
+    result = _panel_orientation(
+        year,
+        round(latitude, _LOCATION_DECIMALS),
+        round(longitude, _LOCATION_DECIMALS),
+        elevation_m,
+        linke_turbidity,
+        albedo,
+    )
     return PanelResponse(
         latitude=latitude,
         longitude=longitude,
         year=year,
+        elevation_m=elevation_m,
+        linke_turbidity=linke_turbidity,
+        albedo=albedo,
         azimuth_deg=result.azimuth_deg,
         annual_tilt_deg=result.annual_tilt_deg,
         winter_tilt_deg=result.winter_tilt_deg,

@@ -1,6 +1,6 @@
 # Calculadora Solar — Plan Técnico
 
-Estado: **plan aprobado, sin implementación iniciada.**
+Estado: **etapa 1 (Sol) implementada y verificada.** Las secciones 3 a 5 describen lo construido; la 6 y la 7, lo que sigue.
 
 ## 1. Decisiones tomadas
 
@@ -10,98 +10,108 @@ Estado: **plan aprobado, sin implementación iniciada.**
 | Frontend | React + TypeScript + Vite | Ecosistema de gráficos amplio (Plotly.js/Recharts/D3). Consistente con `satellite-tracker`. |
 | Motor de cálculo | Python + `numpy` para vectorizar rangos (año completo, grillas) | Las fórmulas son cerradas, no iterativas ni de alto costo — un core en Rust/C sería optimización prematura. Se revisita solo si el profiling muestra un cuello de botella real (candidato futuro: grillas globales de eclipses en etapa 2). |
 | Infra dev | Docker Compose | Consistente con `satellite-tracker`. Sin Postgres/Redis por ahora: la etapa 1 es *stateless* (cálculo puro sin persistencia). Se suma si etapa 3 lo requiere (cache de datos meteorológicos). |
-| Precisión astronómica | Método de baja precisión de Meeus (*Astronomical Algorithms* cap. 25, error < 0.01°) | Más que suficiente para el caso de uso; VSOP87 añade complejidad de tablas sin beneficio práctico. |
-| Alcance punto 5 (potencia solar) | Modelo teórico de cielo despejado (irradiancia extraterrestre + atenuación atmosférica por masa de aire) | Autocontenido, no depende de fuentes de datos externas ni adelanta la etapa 3. |
+| Precisión astronómica | Método de baja precisión de Meeus (*Astronomical Algorithms* cap. 25, error < 0.01°) + ΔT, nutación corta y tiempo sidéreo aparente | Orto/ocaso con error < 4 s frente a astropy; VSOP87 añade complejidad de tablas sin beneficio práctico para el Sol. Para la Luna (etapa 2) la precisión necesaria es mayor. |
+| Alcance punto 5 (potencia solar) | Modelo de cielo despejado de Ineichen y Perez (turbidez de Linke, altitud del lugar) con componentes directa y difusa; el panel suma además la reflejada por el suelo | Autocontenido, no depende de fuentes de datos externas ni adelanta la etapa 3. Resuelve el pendiente de la sección 10. |
 | "Mareas" (etapa 2) | Fuerzas de marea teóricas (posición relativa Sol-Luna-Tierra) | Es astronomía, encaja en el motor ya construido. Las mareas oceánicas reales (altura de marea costera) son oceanografía aplicada — dominio distinto, fuera de alcance salvo que se redefina explícitamente más adelante. |
 | Mobile | Pospuesto | Web responsive alcanza por ahora; se evalúa app nativa/PWA cuando la web esté funcional. |
 
 ## 2. Fuentes de referencia
 
-Fuente primaria (dominio de trabajo cotidiano — **no de dominio público**, uso privado de referencia para implementar código propio, ver nota de copyright abajo):
+Los libros están en `~/Documentos/Algoritmos Astronómicos/` (uso privado de referencia para implementar código propio, ver nota de copyright abajo). **No se distribuyen con el repositorio.**
 
-- `~/Documentos/Jean Meuss/Jean Meuss - Astronomical Algorithms 2ed.pdf`
-- `~/Documentos/Jean Meuss/Jean Meuss - Mathematical Astronomy Morsels.pdf`
-- `~/Documentos/Jean Meuss/Jean Meuss - More Mathematical Astronomy Morsels.pdf`
-- Extracto ya elaborado: `guias-del-sol-jean-meeus.md` (solo temas del Sol — **no cubre Luna ni calendario**, ver Sección 6).
+Fuente primaria:
 
-Fuentes de respaldo, para lo que Meeus no cubre (irradiancia/radiometría, refracción atmosférica detallada, mareas teóricas si se necesita mayor rigor):
+- `Astronomical Algorithms - Jean Meeus - 1998 - 2ed.pdf`
+- `Mathematical Astronomy Morsels - Jean Meeus - 1997 - 1ed.pdf`
+- `More Mathematical Astronomy Morsels - Jean Meeus - 2002 - 1ed.pdf`
 
-- `~/Documentos/Danby, J. M. A. - Fundamentals of Celestial Mechanics, 2nd Edition.pdf`
-- `~/Documentos/Davis Vallado - Methods of Astrodynamics.pdf`
-- `~/Documentos/Explanatory Supplement Astronomical Almanac.pdf`
+Fuentes de respaldo, para lo que Meeus no cubre:
+
+- `Explanatory Supplement to the Astronomical Almanac - P. Kenneth Seidelmann - 1992 - 1ed.pdf`: escalas de tiempo, ΔT, precesión y nutación, refracción.
+- `Davis Vallado - Methods of Astrodynamics.pdf`: conversiones de tiempo, tiempo sidéreo, posición del Sol y la Luna; útil para validar la etapa 2.
+- `Computer Programs for Sun and Moon Illuminance - P. M. Janiczek y J. A. DeYoung - 1987 - 1ed.pdf`: iluminancia (lux) del Sol, la Luna y el cielo, incluidos crepúsculos. Pendiente de usar (etapa 2).
+
+Los modelos de irradiancia (Ineichen y Perez, Kasten y Young, Liu y Jordan) son de la literatura de ingeniería solar y no están en esos libros.
 
 **Nota de copyright**: estos libros no son de dominio público (términos de vida+70 años vigentes). Los algoritmos/fórmulas en sí no son objeto de copyright; lo que no debe reproducirse textualmente en artefactos públicos (repo público, documentación publicada) es la prosa/tablas compiladas de los libros. Uso interno como referencia técnica: sin problema.
 
-## 3. Estructura de carpetas propuesta
+## 3. Estructura de carpetas
 
 ```
-calculadora_solar/
+ephemeris/
 ├── docker-compose.yml
 ├── backend/
-│   ├── pyproject.toml
 │   ├── app/
-│   │   ├── main.py                 # FastAPI app
+│   │   ├── main.py                 # FastAPI app (CORS configurable, ver config.py)
+│   │   ├── config.py               # variables de entorno (CORS_ORIGINS)
 │   │   ├── solar/                  # motor de cálculo astronómico (puro, sin framework)
-│   │   │   ├── time.py             # JD, T (siglos julianos), manejo de zona horaria
-│   │   │   ├── coordinates.py      # posición solar: L0, M, C, longitud verdadera, RA/dec (Meeus cap. 25)
-│   │   │   ├── horizontal.py       # transformación ecuatorial → horizontal (azimut/altitud)
-│   │   │   ├── events.py           # orto, tránsito, ocaso (Meeus cap. 15)
-│   │   │   ├── refraction.py       # refracción atmosférica (Meeus cap. 16)
-│   │   │   └── irradiance.py       # irradiancia extraterrestre + masa de aire (fuente de respaldo, no Meeus)
-│   │   ├── api/                    # routers FastAPI, uno por punto/feature
-│   │   └── schemas/                # modelos Pydantic (request/response)
-│   └── tests/                      # tests unitarios del motor, con casos de referencia del propio libro de Meeus
-└── frontend/
-    ├── package.json
-    ├── vite.config.ts
-    └── src/
-        ├── api/                    # cliente HTTP tipado
-        ├── pages/                  # una por punto: HorasDeSol, SunPath, Mediodia, Irradiancia
-        └── components/charts/      # componentes de gráficos reutilizables
+│   │   │   ├── time.py             # JD, calendario juliano/gregoriano, ΔT, TT, tiempo sidéreo
+│   │   │   ├── nutation.py         # nutación en longitud y oblicuidad, ecuación de los equinoccios
+│   │   │   ├── coordinates.py      # posición solar: L0, M, C, longitud verdadera, RA/dec
+│   │   │   ├── horizontal.py       # ecuatorial -> horizontal (azimut/altitud)
+│   │   │   ├── events.py           # orto, tránsito, ocaso; trayectoria; irradiación diaria
+│   │   │   ├── refraction.py       # refracción atmosférica
+│   │   │   ├── irradiance.py       # cielo despejado: DNI, DHI, GHI
+│   │   │   ├── twilight.py         # crepúsculos, hora azul y dorada
+│   │   │   ├── seasons.py          # equinoccios y solsticios
+│   │   │   └── panel.py            # orientación óptima de un panel fijo
+│   │   ├── api/                    # routers FastAPI
+│   │   └── schemas/                # modelos Pydantic
+│   └── tests/                      # tests del motor y de la API
+└── frontend/                       # React + TypeScript + Vite (ESLint + Vitest)
 ```
 
-`app/solar/` es el módulo clave: agnóstico de FastAPI, testeable de forma aislada, y es el que crece en etapas 2 y 3 sin tocar el resto.
+`app/solar/` es el módulo clave: agnóstico de FastAPI, testeable de forma aislada, y es el que crece en las etapas 2 y 3 sin tocar el resto.
 
 ## 4. Motor de cálculo — Etapa 1
 
-Todos los ángulos en grados salvo que se indique lo contrario; conversión a radianes solo en el borde de las funciones trigonométricas.
+Todos los ángulos en grados salvo que se indique lo contrario; conversión a radianes solo en el borde de las funciones trigonométricas. Longitud positiva al este, azimut desde el Norte en sentido horario.
 
-### 4.1 `time.py`
-- Fecha calendario → Día Juliano (JD) → siglos julianos desde J2000.0 (T).
-- Manejo explícito de zona horaria del observador (input) vs. UT interno de cálculo — **crítico y fácil de hacer mal**; toda la app calcula en UT y convierte a hora local solo en la capa de presentación.
+### 4.1 Tiempo y escalas (`time.py`, `nutation.py`)
+- Fecha calendario -> Día Juliano (JD) -> siglos julianos desde J2000.0 (T).
+- La app calcula en UT y convierte a hora local solo en la capa de presentación. Los `datetime` son gregorianos prolépticos; el calendario histórico de Meeus (juliano hasta 1582-10-04) está en `julian_day_from_calendar` / `calendar_from_julian_day`, que trabajan con tuplas para no mezclar calendarios (lo necesitarán la Pascua y el calendario de la etapa 2).
+- **ΔT = TT - UT**: datos medidos IERS 1990-2026 interpolados, polinomios de Espenak y Meeus antes, y extrapolación empalmada después. La posición del Sol se evalúa en TT (`julian_century_tt`) y el ángulo horario en UT.
+- **Tiempo sidéreo aparente** (`apparent_sidereal_time`): medio más ecuación de los equinoccios, con la nutación en su versión corta (Meeus cap. 22, ~0.5").
 
-### 4.2 `coordinates.py` — posición solar (Meeus cap. 25, método de baja precisión)
-- Longitud media ($L_0$), anomalía media ($M$), excentricidad orbital ($e$), ecuación del centro ($C$).
-- Longitud verdadera del Sol ($\odot = L_0 + C$).
-- Oblicuidad de la eclíptica ($\epsilon$) → ascensión recta ($\alpha$) y declinación ($\delta$).
+### 4.2 `coordinates.py` — posición solar (Meeus cap. 25, baja precisión)
+- L0, M, e, ecuación del centro, longitud verdadera y aparente, oblicuidad, α y δ, radio vector.
 
-### 4.3 `horizontal.py` — transformación a coordenadas horizontales
-- Ángulo horario ($H$) a partir de $\alpha$, tiempo sidéreo local y longitud del observador.
-- Altitud ($h$) y azimut ($A$) a partir de $H$, $\delta$, latitud ($\varphi$) — fórmulas estándar de transformación ecuatorial→horizontal (no exclusivas del cap. 25, son de la parte general de transformación de coordenadas del libro).
-- Base directa de los **puntos 3 y 4** (trayectoria del sol, azimut de salida, altitud a mediodía).
+### 4.3 `horizontal.py` — ecuatorial a horizontal (Meeus cap. 13)
+- Ángulo horario, altitud y azimut. Base de la trayectoria y el mediodía.
 
-### 4.4 `events.py` — orto, tránsito, ocaso (Meeus cap. 15)
-- Altitud estándar $h_0 = -0.833°$ para orto/ocaso aparente.
-- Algoritmo iterativo de Meeus para las horas exactas de salida, tránsito (mediodía solar) y puesta en UT.
-- Base directa de los **puntos 1, 2 y 4** (horas de sol, evolución anual, hora del mediodía).
+### 4.4 `events.py` — orto, tránsito y ocaso (Meeus cap. 15)
+- Altitud estándar h0 = -0.8333°.
+- El cruce de una altitud se resuelve iterando sobre el **ángulo horario** (semiarco H0 con la declinación de cada instante), no por Newton sobre la altitud: es estable cuando el Sol apenas roza el umbral (días límite en latitudes altas, donde la versión anterior llegó a errar más de 15 minutos).
+- **Día solar local:** el parámetro `date` es el día que va de una medianoche media local a la siguiente (0h UT menos longitud/15 h). Las series muestreadas (trayectoria, irradiancia, panel) parten de ahí y no de 0h UT; con 0h UT, a longitudes al este de ~+90° el amanecer quedaba fuera de la ventana y la energía diaria se subestimaba.
 
-### 4.5 `refraction.py` — refracción atmosférica (Meeus cap. 16, a incorporar; no estaba en el extracto actual)
-- Corrección de altitud aparente vs. verdadera cerca del horizonte. Afecta precisión de orto/ocaso.
+### 4.5 `refraction.py` — refracción (Meeus cap. 16)
+- Sæmundsson (verdadera -> aparente) y Bennett (inversa), con corrección por presión y temperatura. Los endpoints `/sol/mediodia` y `/sol/trayectoria` aceptan `pressure_mbar` y `temperature_c`. El orto/ocaso sigue usando la altitud estándar -0.8333° (que ya incluye la refracción típica del horizonte).
 
-### 4.6 `irradiance.py` — potencia solar recibida (fuente de respaldo, Meeus no lo cubre)
-- Irradiancia extraterrestre (constante solar ajustada por distancia Tierra-Sol, ya tenemos $R$ del cap. 25).
-- Atenuación atmosférica por masa de aire (modelo tipo Kasten-Young) en función de la altitud solar $h$.
-- Integración a lo largo del día → energía por m² (punto 5), asumiendo cielo despejado.
+### 4.6 `irradiance.py` — cielo despejado
+- Masa de aire de Kasten y Young (1989), corregida por la presión según la altitud del lugar.
+- Ineichen y Perez (2002): DNI, DHI y GHI en función de la turbidez de Linke y la altitud. Parámetros: `elevation_m`, `linke_turbidity`.
+- `panel.py` suma sobre el plano inclinado la directa (coseno de incidencia), la difusa isótropa de Liu y Jordan y la reflejada por el suelo (`albedo`).
+- Límites: cielo despejado sin nubes ni sombras, turbidez fija (no medida). Es una estimación del potencial solar, no un dimensionamiento fotovoltaico.
 
-## 5. Endpoints / features — Etapa 1
+### 4.7 Verificación
+- Ejemplos numéricos de Meeus (caps. 7, 12, 22, 25) y calendario/ΔT en `tests/solar/`.
+- `tests/solar/test_reference.py`: orto/ocaso contra astropy (efemérides ERFA independientes) en 7 casos que incluyen longitudes al este de +150° y latitudes de 65°, más una propiedad (la altitud en el instante devuelto es la pedida) en latitudes de 60° a 70°.
+- Medición puntual (10 ubicaciones x 7 fechas x 3 umbrales): error máximo de orto/ocaso 3.3 s; antes de los cambios, 5.5 s y, en días límite polares, de 16 minutos o más.
 
-| # | Feature | Endpoint (borrador) | Módulos usados |
+## 5. Endpoints — Etapa 1
+
+| # | Feature | Endpoint | Módulos usados |
 |---|---|---|---|
 | 1 | Horas de sol en un día | `GET /sol/dia` | time, coordinates, events |
-| 2 | Evolución anual de horas de sol | `GET /sol/anual` (vectorizado con numpy sobre 365 días) | + refraction |
-| 3 | Trayectoria/posición de salida del sol (gráfico polar) | `GET /sol/trayectoria` | + horizontal |
-| 4 | Mediodía solar + inclinación | `GET /sol/mediodia` | events, horizontal |
-| 5 | Potencia recibida por m² | `GET /sol/irradiancia` | + irradiance |
+| 2 | Evolución anual | `GET /sol/anual` (vectorizado sobre el año, con caché) | events |
+| 3 | Trayectoria del sol | `GET /sol/trayectoria` | horizontal, refraction |
+| 4 | Mediodía solar e inclinación | `GET /sol/mediodia` | events, horizontal, refraction |
+| 5 | Potencia por m2 | `GET /sol/irradiancia` | irradiance |
+| 6 | Crepúsculos, hora azul y dorada | `GET /sol/crepusculos` | twilight |
+| 7 | Equinoccios y solsticios | `GET /sol/estaciones` | seasons |
+| 8 | Panel solar óptimo | `GET /sol/panel` (con caché) | panel |
+
+`/sol/anual` y `/sol/panel` cachean el resultado por ubicación (redondeada a 4 decimales) y parámetros.
 
 ## 6. Etapa 2 — trabajo previo necesario
 
@@ -109,7 +119,7 @@ El extracto `guias-del-sol-jean-meeus.md` está enfocado **solo en el Sol**. Par
 
 - Posición de la Luna (cap. 47), fracción iluminada/fase (cap. 48-49) — calendario lunar.
 - Cálculo de la fecha de Pascua (cap. 8) y capítulos de calendarios (cap. 7).
-- Mareas teóricas: no hay capítulo dedicado exclusivo en Meeus; se apoyaría en la posición Sol-Luna ya calculada más teoría de marea gravitatoria de Danby/Vallado.
+- Mareas teóricas: no hay capítulo dedicado exclusivo en Meeus; se apoyaría en la posición Sol-Luna ya calculada más teoría de marea gravitatoria (Vallado, Explanatory Supplement).
 
 Acción sugerida cuando lleguemos a esa etapa: repetir el proceso de extracción de algoritmos (como hiciste con el Sol) para estos capítulos antes de planificar el detalle técnico de la etapa 2.
 
@@ -117,7 +127,7 @@ Acción sugerida cuando lleguemos a esa etapa: repetir el proceso de extracción
 
 Fuera del alcance de los libros disponibles: requiere integración con fuentes de datos externas (ej. Open-Meteo, NASA POWER) para series históricas de lluvia/nubosidad. Es trabajo de integración de datos, no de cálculo astronómico — se planifica en detalle cuando se llegue a esa etapa.
 
-## 8. Backlog sugerido — orden de implementación Etapa 1
+## 8. Backlog de la etapa 1 (completado)
 
 1. `time.py` + tests con casos de ejemplo verificados a mano/con el libro.
 2. `coordinates.py` (posición solar) + tests contra ejemplos numéricos de Meeus cap. 25.
@@ -131,10 +141,17 @@ Fuera del alcance de los libros disponibles: requiere integración con fuentes d
 
 ## 9. Convenciones de desarrollo
 
-Espejo de `satellite-tracker`: pre-commit (lint + tests), CI en push, Ruff para Python, ESLint + Google TS style guide para el frontend (via skill `typescript-google-implement`).
+pre-commit (ruff, pytest, eslint), CI en push y pull request, Ruff para Python, ESLint 9 + typescript-eslint para el frontend, pytest y Vitest. Comentarios y mensajes en español, sin emojis.
 
-## 10. Riesgos / pendientes abiertos
+## 10. Riesgos y pendientes
 
-- Validar el manejo de zona horaria / horario de verano antes de construir la UI (afecta puntos 1, 2 y 4).
-- Definir cómo se ingresa la ubicación (lat/lon manual vs. buscador de dirección) — no bloquea el motor de cálculo, sí a la UI.
-- El modelo de irradiancia de cielo despejado (punto 5) no tiene aún una fórmula concreta seleccionada de una fuente específica — pendiente de elegir entre Danby/Vallado/Explanatory Supplement u otra referencia estándar (ej. ASHRAE clear-sky) al momento de implementar ese módulo.
+Resueltos en la etapa 1:
+- Zona horaria: el motor es UT; el frontend convierte a la hora local del lugar. El parámetro `date` es el día solar local (sección 4.4).
+- Modelo de irradiancia: Ineichen y Perez (sección 4.6).
+- Ubicación: buscador de direcciones (Nominatim) con límite de uso respetado y coordenadas manuales.
+
+Abiertos:
+- La precisión del Sol (~3 s en orto/ocaso) no alcanza para eclipses; la etapa 2 necesita VSOP87 o ELP simplificado y nutación completa (63 términos).
+- ΔT más allá de 2026 es un pronóstico; conviene actualizar la tabla medida una vez al año.
+- Dependencia de servicios externos en el frontend (Nominatim, Open-Meteo para la zona horaria): sin SLA; considerar un proxy en el backend si se publica.
+- El modelo de cielo despejado no representa nubosidad (etapa 3).

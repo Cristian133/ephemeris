@@ -4,6 +4,8 @@ import type { PanelResponse } from '../api/types'
 import { useLocation } from '../context/LocationContext'
 import { compassLabel } from '../utils/compass'
 import { ExportButtons } from '../components/ExportButtons'
+import { SkyModelControls } from '../components/SkyModelControls'
+import { DEFAULT_ALBEDO, DEFAULT_SKY_MODEL } from '../utils/skyModel'
 import { PanelTiltChart } from '../components/charts/PanelTiltChart'
 
 function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
@@ -22,17 +24,19 @@ export default function PanelSolar() {
   const [year, setYear] = useState(() => new Date().getFullYear())
   const [data, setData] = useState<PanelResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sky, setSky] = useState(DEFAULT_SKY_MODEL)
+  const [albedo, setAlbedo] = useState(DEFAULT_ALBEDO)
   const chartRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!location) return
     setError(null)
-    getPanel({ latitude: location.latitude, longitude: location.longitude, year })
+    getPanel({ latitude: location.latitude, longitude: location.longitude, year, albedo, ...sky })
       .then(setData)
       .catch((err: unknown) => {
         setError(err instanceof ApiError ? err.message : 'No se pudo calcular el panel óptimo.')
       })
-  }, [location, year])
+  }, [location, year, sky, albedo])
 
   if (!location) return null
 
@@ -45,10 +49,17 @@ export default function PanelSolar() {
       <h1 style={{ marginBottom: '0.25rem' }}>Panel solar óptimo</h1>
       <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>{location.displayName}</p>
       <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-        Panel fijo mirando al ecuador. Modelo teórico de cielo despejado, solo luz directa (sin
-        nubosidad ni difusa): es una referencia de orden de magnitud, no un dimensionamiento
-        fotovoltaico — con luz difusa, la inclinación ideal real suele ser algo menor.
+        Panel fijo mirando al ecuador. Modelo teórico de cielo despejado que suma luz directa,
+        difusa y reflejada por el suelo, sin nubosidad ni sombras: sirve para elegir la
+        orientación, no como dimensionamiento fotovoltaico.
       </p>
+
+      <SkyModelControls
+        sky={sky}
+        onChange={setSky}
+        albedo={albedo}
+        onAlbedoChange={setAlbedo}
+      />
 
       <label style={{ display: 'block', marginBottom: '1.5rem' }}>
         Año:{' '}

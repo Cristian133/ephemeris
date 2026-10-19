@@ -6,10 +6,9 @@ eventos astronómicos del año — las estaciones son un asunto de hemisferio
 (el equinoccio de marzo es el otoño austral y la primavera boreal), así que
 el nombre de la estación lo pone quien presenta el dato, no este módulo.
 
-Como en el resto del motor se ignora ΔT (TD-UT, ~1 minuto hoy): el JDE que
-da el libro está en Tiempo Dinámico y acá se lo trata como UT. Es del orden
-de la precisión de minutos del algoritmo, y consistente con
-`app.solar.coordinates`.
+El JDE que da el libro está en Tiempo Dinámico (TT); se lo convierte a UT
+restándole ΔT (`app.solar.time.delta_t`, ~69 s hoy), que es lo que ve un
+reloj.
 """
 
 from dataclasses import dataclass
@@ -17,7 +16,7 @@ from datetime import datetime
 
 import numpy as np
 
-from app.solar.time import datetime_from_julian_day
+from app.solar.time import datetime_from_julian_day, delta_t
 
 MIN_YEAR = 1000
 MAX_YEAR = 3000
@@ -73,6 +72,7 @@ class Seasons:
 
 
 def _event_jd(year: int, event: str) -> float:
+    """JD (UT) del evento: el JDE del libro menos ΔT."""
     y = (year - 2000) / 1000
     a, b, c, d, e = _MEAN_COEFFICIENTS[event]
     jde0 = a + y * (b + y * (c + y * (d + y * e)))
@@ -83,7 +83,8 @@ def _event_jd(year: int, event: str) -> float:
 
     amplitude, phase, rate = _PERIODIC_TERMS.T
     s = float(np.sum(amplitude * np.cos(np.radians(phase + rate * t))))
-    return jde0 + 0.00001 * s / float(delta_lambda)
+    jde = jde0 + 0.00001 * s / float(delta_lambda)
+    return jde - delta_t(jde) / 86_400
 
 
 def seasons(year: int) -> Seasons:

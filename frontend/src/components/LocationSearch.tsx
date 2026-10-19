@@ -22,6 +22,7 @@ export function LocationSearch() {
   useEffect(() => {
     if (debouncedQuery.trim().length < 3) {
       setResults([])
+      setIsLoading(false)
       return
     }
 
@@ -34,11 +35,15 @@ export function LocationSearch() {
         setResults(found)
         setIsOpen(true)
       })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+      .catch(() => {
+        // Abortada por una busqueda nueva o por desmontar: no es un error.
+        if (controller.signal.aborted) return
         setError('No se pudo buscar la dirección. Probá de nuevo.')
       })
-      .finally(() => setIsLoading(false))
+      .finally(() => {
+        // Una request abortada no debe apagar el "Buscando..." de la nueva.
+        if (!controller.signal.aborted) setIsLoading(false)
+      })
 
     return () => controller.abort()
   }, [debouncedQuery])

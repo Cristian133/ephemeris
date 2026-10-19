@@ -59,6 +59,8 @@ class TrajectoryResponse(BaseModel):
     latitude: float
     longitude: float
     date: date
+    pressure_mbar: float
+    temperature_c: float
     samples: list[SunPosition]
 
 
@@ -68,11 +70,14 @@ class SolarNoonResponse(BaseModel):
     `altitude_deg` es la altitud verdadera máxima del día;
     `apparent_altitude_deg` es la que realmente se vería (corrección por
     refracción). `azimuth_deg` es 0° (Norte) o 180° (Sur) salvo en el caso
-    límite del Sol en el cenit."""
+    límite del Sol en el cenit. `pressure_mbar` y `temperature_c` son las
+    condiciones atmosféricas con que se calculó la refracción."""
 
     latitude: float
     longitude: float
     date: date
+    pressure_mbar: float
+    temperature_c: float
     transit: datetime
     altitude_deg: float
     apparent_altitude_deg: float
@@ -80,20 +85,29 @@ class SolarNoonResponse(BaseModel):
 
 
 class IrradianceSample(BaseModel):
-    """Irradiancia solar (cielo despejado) en un instante dado."""
+    """Irradiancia solar (cielo despejado) sobre una superficie horizontal
+    en un instante dado: `power_w_per_m2` es la global (directa + difusa)."""
 
     time: datetime
     power_w_per_m2: float
+    direct_w_per_m2: float
+    diffuse_w_per_m2: float
 
 
 class IrradianceResponse(BaseModel):
     """Irradiancia solar a lo largo de un día y la energía total recibida
-    por m² en el día, en cielo despejado (punto 5)."""
+    por m² en el día, en cielo despejado (punto 5), con su desglose en
+    componente directa y difusa. `elevation_m` y `linke_turbidity` son los
+    parámetros del modelo con que se calculó."""
 
     latitude: float
     longitude: float
     date: date
+    elevation_m: float
+    linke_turbidity: float
     energy_wh_per_m2: float
+    direct_energy_wh_per_m2: float
+    diffuse_energy_wh_per_m2: float
     samples: list[IrradianceSample]
 
 
@@ -149,13 +163,18 @@ class TiltEnergy(BaseModel):
 
 
 class PanelResponse(BaseModel):
-    """Orientación óptima de un panel solar fijo (cielo despejado, solo
-    componente directa). `azimuth_deg` es hacia dónde mira (0°=Norte,
-    180°=Sur); las inclinaciones se miden desde la horizontal."""
+    """Orientación óptima de un panel solar fijo (cielo despejado, con
+    componentes directa, difusa y reflejada por el suelo). `azimuth_deg` es
+    hacia dónde mira (0°=Norte, 180°=Sur); las inclinaciones se miden desde
+    la horizontal. `elevation_m`, `linke_turbidity` y `albedo` son los
+    parámetros del modelo con que se calculó."""
 
     latitude: float
     longitude: float
     year: int
+    elevation_m: float
+    linke_turbidity: float
+    albedo: float
     azimuth_deg: float
     annual_tilt_deg: float
     winter_tilt_deg: float

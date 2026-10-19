@@ -25,7 +25,7 @@ FloatOrArray = float | NDArray[np.floating]
 cualquiera de los dos y devuelven el tipo correspondiente."""
 
 
-def _wrap180(angle_deg: ArrayLike) -> FloatOrArray:
+def wrap180(angle_deg: ArrayLike) -> FloatOrArray:
     """Normaliza un ángulo a (-180, 180]."""
     return (angle_deg + 180) % 360 - 180
 
@@ -42,7 +42,7 @@ def hour_angle(local_sidereal_time_deg: ArrayLike, right_ascension_deg: ArrayLik
 
     H = tiempo sidéreo local - ascensión recta: negativo antes del tránsito
     (mañana), positivo después (tarde)."""
-    return _wrap180(local_sidereal_time_deg - right_ascension_deg)
+    return wrap180(local_sidereal_time_deg - right_ascension_deg)
 
 
 def altitude(
