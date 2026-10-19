@@ -12,4 +12,9 @@ Módulos (ver docs/plan_tecnico.md, sección 4):
   Bennett). Hecho.
 - irradiance.py: irradiancia de cielo despejado (fuente de respaldo, no
   Meeus; modelo Kasten-Young + Meinel & Meinel). Hecho.
+- seasons.py: equinoccios y solsticios (Meeus, cap. 27). Hecho.
+- twilight.py: crepúsculos, hora azul y hora dorada (cruces de altitud sobre
+  events.py). Hecho.
+- panel.py: inclinación y orientación óptimas de un panel fijo (usa
+  irradiance.py). Hecho.
 """

@@ -36,3 +36,25 @@ export async function searchLocation(
     longitude: Number(r.lon),
   }))
 }
+
+const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse'
+
+/** Nombre legible de un punto (geocodificación inversa). Devuelve `null`
+ * si Nominatim no lo conoce (ej. mar abierto) o falla: quien llama decide
+ * cómo rotular el lugar en ese caso. */
+export async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+  const params = new URLSearchParams({
+    lat: String(latitude),
+    lon: String(longitude),
+    format: 'jsonv2',
+    zoom: '10',
+  })
+  try {
+    const response = await fetch(`${NOMINATIM_REVERSE_URL}?${params}`)
+    if (!response.ok) return null
+    const data = (await response.json()) as { display_name?: string }
+    return data.display_name ?? null
+  } catch {
+    return null
+  }
+}

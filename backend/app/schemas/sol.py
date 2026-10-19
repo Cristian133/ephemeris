@@ -95,3 +95,71 @@ class IrradianceResponse(BaseModel):
     date: date
     energy_wh_per_m2: float
     samples: list[IrradianceSample]
+
+
+class AltitudeCrossing(BaseModel):
+    """Instantes en que el Sol sube (`rise`) y baja (`set`) por una
+    altitud dada. Ambos son `None` si ese día no la cruza; `always_above`
+    indica entonces si queda todo el día por encima o por debajo."""
+
+    altitude_deg: float
+    rise: datetime | None
+    set: datetime | None
+    always_above: bool | None
+
+
+class TwilightResponse(BaseModel):
+    """Cruces del Sol por las altitudes que delimitan los crepúsculos y las
+    horas azul y dorada, de la más baja a la más alta: astronómico (-18°),
+    náutico (-12°), civil (-6°), límite de hora azul (-4°), horizonte
+    (orto/ocaso, -0.83°) y límite de hora dorada (+6°).
+
+    Mañana: la hora azul va del cruce civil al de -4°, la dorada del de -4°
+    al de +6°. Tarde: al revés (dorada de +6° a -4°, azul de -4° a -6°).
+    """
+
+    latitude: float
+    longitude: float
+    date: date
+    astronomical: AltitudeCrossing
+    nautical: AltitudeCrossing
+    civil: AltitudeCrossing
+    blue_hour_limit: AltitudeCrossing
+    horizon: AltitudeCrossing
+    golden_hour_limit: AltitudeCrossing
+
+
+class SeasonsResponse(BaseModel):
+    """Equinoccios y solsticios de un año (UT). Qué estación inicia cada
+    uno depende del hemisferio: el equinoccio de marzo es el otoño austral
+    y la primavera boreal."""
+
+    year: int
+    march_equinox: datetime
+    june_solstice: datetime
+    september_equinox: datetime
+    december_solstice: datetime
+
+
+class TiltEnergy(BaseModel):
+    """Energía anual recibida por m² de panel para una inclinación."""
+
+    tilt_deg: float
+    annual_kwh_per_m2: float
+
+
+class PanelResponse(BaseModel):
+    """Orientación óptima de un panel solar fijo (cielo despejado, solo
+    componente directa). `azimuth_deg` es hacia dónde mira (0°=Norte,
+    180°=Sur); las inclinaciones se miden desde la horizontal."""
+
+    latitude: float
+    longitude: float
+    year: int
+    azimuth_deg: float
+    annual_tilt_deg: float
+    winter_tilt_deg: float
+    summer_tilt_deg: float
+    annual_kwh_per_m2: float
+    horizontal_kwh_per_m2: float
+    curve: list[TiltEnergy]

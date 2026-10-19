@@ -158,19 +158,6 @@ export function LocationSearch() {
           {error}
         </p>
       )}
-
-      <p style={{ margin: '0.25rem 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-        Datos de{' '}
-        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
-          OpenStreetMap
-        </a>
-        {location && (
-          <>
-            {' '}
-            · hora local: <strong>{location.timezone}</strong>
-          </>
-        )}
-      </p>
     </div>
   )
 }

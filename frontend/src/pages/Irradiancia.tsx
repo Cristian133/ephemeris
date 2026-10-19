@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError, getIrradiance } from '../api/client'
 import type { IrradianceResponse } from '../api/types'
 import { useLocation } from '../context/LocationContext'
 import { useDate } from '../context/DateContext'
+import { formatTime } from '../utils/date'
+import { ExportButtons } from '../components/ExportButtons'
 import { DailyIrradianceChart } from '../components/charts/DailyIrradianceChart'
 
 /** Potencia solar recibida por m² (punto 5), modelo teórico de cielo
@@ -12,6 +14,7 @@ export default function Irradiancia() {
   const { date } = useDate()
   const [data, setData] = useState<IrradianceResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const chartRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!location) return
@@ -46,7 +49,20 @@ export default function Irradiancia() {
               {(data.energy_wh_per_m2 / 1000).toFixed(2)} kWh/m²
             </div>
           </div>
-          <DailyIrradianceChart data={data} timezone={location.timezone} />
+          <div ref={chartRef}>
+            <DailyIrradianceChart data={data} timezone={location.timezone} />
+          </div>
+          <ExportButtons
+            filename={`irradiancia-${data.date}`}
+            chartRef={chartRef}
+            getCsvRows={() => [
+              [`hora_local (${location.timezone})`, 'irradiancia_w_por_m2'],
+              ...data.samples.map((s) => [
+                formatTime(s.time, location.timezone),
+                Number(s.power_w_per_m2.toFixed(1)),
+              ]),
+            ]}
+          />
         </>
       )}
     </div>

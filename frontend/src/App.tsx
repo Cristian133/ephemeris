@@ -4,10 +4,14 @@ import HorasDeSol from './pages/HorasDeSol'
 import Trayectoria from './pages/Trayectoria'
 import Mediodia from './pages/Mediodia'
 import Irradiancia from './pages/Irradiancia'
+import Crepusculos from './pages/Crepusculos'
+import Estaciones from './pages/Estaciones'
+import PanelSolar from './pages/PanelSolar'
 
 /** Una ruta por feature del plan técnico (sección 5): horas de sol
  * (puntos 1+2), trayectoria (punto 3), mediodía (punto 4), irradiancia
- * (punto 5). `Layout` comparte la navegación, la ubicación y la fecha. */
+ * (punto 5), más crepúsculos, estaciones y panel solar. `Layout` comparte
+ * la navegación, la ubicación y la fecha. */
 export default function App() {
   return (
     <Routes>
@@ -16,6 +20,9 @@ export default function App() {
         <Route path="trayectoria" element={<Trayectoria />} />
         <Route path="mediodia" element={<Mediodia />} />
         <Route path="irradiancia" element={<Irradiancia />} />
+        <Route path="crepusculos" element={<Crepusculos />} />
+        <Route path="estaciones" element={<Estaciones />} />
+        <Route path="panel" element={<PanelSolar />} />
       </Route>
     </Routes>
   )

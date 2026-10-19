@@ -17,6 +17,8 @@
 
   --series-1: #2a78d6; /* azul: serie principal (horas de sol / altitud) */
   --series-2: #eb6834; /* naranja: segunda serie cuando hace falta */
+  --series-3: #2f9e6d; /* verde */
+  --series-4: #8a5fd0; /* violeta */
 
   --font-sans:
     system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -37,6 +39,8 @@
 
     --series-1: #3987e5;
     --series-2: #d95926;
+    --series-3: #3fb583;
+    --series-4: #a07ce0;
   }
 }
 

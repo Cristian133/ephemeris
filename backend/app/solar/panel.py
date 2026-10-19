@@ -1,0 +1,116 @@
+"""Orientación óptima de un panel solar fijo.
+
+Para cada inclinación candidata se integra, a lo largo del año, la
+irradiancia directa que recibe el plano (modelo de cielo despejado de
+`app.solar.irradiance`, proyectada con el coseno del ángulo de incidencia)
+y se elige la que más energía acumula. El azimut es siempre hacia el
+ecuador: norte en el hemisferio sur, sur en el norte.
+
+Mismo alcance (y mismas limitaciones) que `irradiance.py`: solo componente
+directa, sin nubosidad, difusa ni reflejada, así que el óptimo que sale es
+una referencia de orden de magnitud — en la práctica la difusa tiende a
+favorecer inclinaciones algo menores. No es un dimensionamiento fotovoltaico.
+
+Vectorizado con numpy: se muestrea un día de cada `_DAY_STEP` del año a
+`_SAMPLES_PER_DAY` instantes y se evalúan todas las inclinaciones de una
+vez, sin iterar en Python.
+"""
+
+import calendar
+from dataclasses import dataclass
+from datetime import UTC, datetime
+
+import numpy as np
+
+from app.solar.coordinates import declination, radius_vector, right_ascension
+from app.solar.horizontal import altitude, azimuth, hour_angle, local_sidereal_time
+from app.solar.irradiance import direct_beam_irradiance
+from app.solar.time import julian_century, julian_day, mean_sidereal_time
+
+_DAY_STEP = 5
+_SAMPLES_PER_DAY = 96
+_TILTS = np.arange(0, 91, dtype=float)
+_CURVE_STEP = 5
+
+
+@dataclass(frozen=True)
+class PanelOrientation:
+    """Orientación óptima de un panel fijo para una ubicación y año.
+
+    `azimuth_deg` es el rumbo hacia el que mira el panel (0°=Norte,
+    180°=Sur). Las energías son kWh por m² de panel al año, con el panel
+    en la inclinación indicada; `curve` es la energía anual para cada
+    inclinación de 0° a 90° cada 5°.
+    """
+
+    azimuth_deg: float
+    annual_tilt_deg: float
+    winter_tilt_deg: float
+    summer_tilt_deg: float
+    annual_kwh_per_m2: float
+    horizontal_kwh_per_m2: float
+    curve: list[tuple[float, float]]
+
+
+def _plane_power(jd: np.ndarray, latitude_deg: float, longitude_deg: float, panel_azimuth: float):
+    """Potencia (W/m² de panel) en cada instante `jd` para cada inclinación
+    de `_TILTS`: array de forma (len(jd), len(_TILTS))."""
+    t = julian_century(jd)
+    alpha = right_ascension(t)
+    delta = declination(t)
+    lst = local_sidereal_time(mean_sidereal_time(jd), longitude_deg)
+    h = hour_angle(lst, alpha)
+
+    alt = altitude(latitude_deg, delta, h)
+    az = azimuth(latitude_deg, delta, h)
+    beam = direct_beam_irradiance(alt, radius_vector(t))
+
+    alt_rad = np.radians(alt)[:, None]
+    tilt_rad = np.radians(_TILTS)[None, :]
+    delta_az = np.radians(az - panel_azimuth)[:, None]
+    cos_incidence = np.sin(alt_rad) * np.cos(tilt_rad) + np.cos(alt_rad) * np.sin(
+        tilt_rad
+    ) * np.cos(delta_az)
+    return beam[:, None] * np.clip(cos_incidence, 0.0, None)
+
+
+def _day_jd(year: int, month: int, day: int) -> np.ndarray:
+    jd0 = julian_day(datetime(year, month, day, tzinfo=UTC))
+    return jd0 + np.arange(_SAMPLES_PER_DAY, dtype=float) / _SAMPLES_PER_DAY
+
+
+def optimal_panel_orientation(
+    year: int, latitude_deg: float, longitude_deg: float
+) -> PanelOrientation:
+    """Orientación y inclinaciones óptimas de un panel fijo (anual, y para
+    el solsticio de invierno y de verano) en el año `year`."""
+    panel_azimuth = 0.0 if latitude_deg < 0 else 180.0
+
+    days_in_year = 366 if calendar.isleap(year) else 365
+    sampled_days = np.arange(0, days_in_year, _DAY_STEP, dtype=float)
+    jan1 = julian_day(datetime(year, 1, 1, tzinfo=UTC))
+    day_fractions = np.arange(_SAMPLES_PER_DAY, dtype=float) / _SAMPLES_PER_DAY
+    jd = (jan1 + sampled_days[:, None] + day_fractions[None, :]).ravel()
+    hours_per_sample = 24 / _SAMPLES_PER_DAY
+    power = _plane_power(jd, latitude_deg, longitude_deg, panel_azimuth)
+    annual_kwh = power.sum(axis=0) * hours_per_sample * (days_in_year / len(sampled_days)) / 1000
+
+    june = _plane_power(_day_jd(year, 6, 21), latitude_deg, longitude_deg, panel_azimuth)
+    december = _plane_power(_day_jd(year, 12, 21), latitude_deg, longitude_deg, panel_azimuth)
+    june_tilt = float(_TILTS[june.sum(axis=0).argmax()])
+    december_tilt = float(_TILTS[december.sum(axis=0).argmax()])
+    if latitude_deg < 0:  # el invierno austral es el solsticio de junio
+        winter_tilt, summer_tilt = june_tilt, december_tilt
+    else:
+        winter_tilt, summer_tilt = december_tilt, june_tilt
+
+    best = int(annual_kwh.argmax())
+    return PanelOrientation(
+        azimuth_deg=panel_azimuth,
+        annual_tilt_deg=float(_TILTS[best]),
+        winter_tilt_deg=winter_tilt,
+        summer_tilt_deg=summer_tilt,
+        annual_kwh_per_m2=float(annual_kwh[best]),
+        horizontal_kwh_per_m2=float(annual_kwh[0]),
+        curve=[(float(_TILTS[i]), float(annual_kwh[i])) for i in range(0, 91, _CURVE_STEP)],
+    )
