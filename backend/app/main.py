@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import sol
+from app.api import calendario, eclipses, luna, mareas, sol
 from app.config import settings
 
 app = FastAPI(title="Calculadora Solar API")
@@ -20,6 +20,7 @@ def health() -> dict[str, str]:
 
 
 app.include_router(sol.router, prefix="/sol", tags=["sol"])
-
-# El resto de los routers por feature (docs/plan_tecnico.md, sección 5) se
-# agregan acá a medida que se implementan.
+app.include_router(luna.router, prefix="/luna", tags=["luna"])
+app.include_router(calendario.router, prefix="/calendario", tags=["calendario"])
+app.include_router(mareas.router, prefix="/mareas", tags=["mareas"])
+app.include_router(eclipses.router, prefix="/eclipses", tags=["eclipses"])

@@ -1,10 +1,17 @@
 import type {
   AnnualSunResponse,
+  ApsidesResponse,
   DailySunResponse,
+  EasterResponse,
+  EclipsesResponse,
   IrradianceResponse,
+  MoonDayResponse,
+  MoonPhasesResponse,
+  MoonTrajectoryResponse,
   PanelResponse,
   SeasonsResponse,
   SolarNoonResponse,
+  TideDayResponse,
   TrajectoryResponse,
   TwilightResponse,
 } from './types'
@@ -94,4 +101,40 @@ export function getPanel(
   } & SkyModel,
 ): Promise<PanelResponse> {
   return get('/sol/panel', params)
+}
+
+export function getMoonDay({ latitude, longitude, date }: LocationDate): Promise<MoonDayResponse> {
+  return get('/luna/dia', { latitude, longitude, date })
+}
+
+export function getMoonTrajectory(
+  { latitude, longitude, date }: LocationDate,
+  numSamples = 96,
+): Promise<MoonTrajectoryResponse> {
+  return get('/luna/trayectoria', { latitude, longitude, date, num_samples: numSamples })
+}
+
+export function getMoonPhases(year: number): Promise<MoonPhasesResponse> {
+  return get('/luna/fases', { year })
+}
+
+export function getApsides(year: number): Promise<ApsidesResponse> {
+  return get('/luna/apsides', { year })
+}
+
+/** Eclipses del año; con ubicación, cada eclipse lunar trae la altitud de
+ * la Luna en el máximo desde ese lugar. */
+export function getEclipses(
+  year: number,
+  where?: { latitude: number; longitude: number },
+): Promise<EclipsesResponse> {
+  return get('/eclipses/anio', { year, ...where })
+}
+
+export function getEaster(year: number): Promise<EasterResponse> {
+  return get('/calendario/pascua', { year })
+}
+
+export function getTides({ latitude, longitude, date }: LocationDate): Promise<TideDayResponse> {
+  return get('/mareas/dia', { latitude, longitude, date })
 }

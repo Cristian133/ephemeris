@@ -1,11 +1,11 @@
 """Endpoints de `/sol` (ver docs/plan_tecnico.md, sección 5)."""
 
-from datetime import date as date_type
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Query
 
+from app.api.params import DateParam, Latitude, Longitude, NumSamples
 from app.schemas.sol import (
     AltitudeCrossing,
     AnnualSunResponse,
@@ -36,23 +36,6 @@ from app.solar.twilight import twilight
 
 router = APIRouter()
 
-_MIN_SAMPLES = 24
-_MAX_SAMPLES = 288
-
-Latitude = Annotated[float, Query(ge=-90, le=90, description="Latitud del observador, en grados")]
-Longitude = Annotated[
-    float,
-    Query(ge=-180, le=180, description="Longitud del observador, en grados (positiva al este)"),
-]
-DateParam = Annotated[
-    date_type,
-    Query(
-        description=(
-            "Fecha del día solar local del observador (YYYY-MM-DD): el día que va de una "
-            "medianoche media local a la siguiente, no el día UTC"
-        )
-    ),
-]
 Pressure = Annotated[
     float,
     Query(
@@ -118,16 +101,6 @@ def _panel_orientation(
     return optimal_panel_orientation(
         year, latitude, longitude, elevation_m, linke_turbidity, albedo
     )
-
-
-NumSamples = Annotated[
-    int,
-    Query(
-        ge=_MIN_SAMPLES,
-        le=_MAX_SAMPLES,
-        description="Cantidad de instantes a muestrear a lo largo del día (equiespaciados)",
-    ),
-]
 
 
 @router.get("/anual", response_model=AnnualSunResponse)
