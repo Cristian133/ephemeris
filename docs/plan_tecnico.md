@@ -1,4 +1,4 @@
-# Calculadora Solar — Plan Técnico
+# Ephemeris — Plan Técnico
 
 Estado: **etapas 1 (Sol) y 2 (Luna, eclipses, calendario y mareas teóricas) implementadas y verificadas; etapa 3 (meteorología) implementada (sección 7).** Las secciones 3 a 6 describen lo construido; la 7, lo que sigue.
 

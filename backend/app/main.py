@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import calendario, eclipses, luna, mareas, meteo, sol
 from app.config import settings
 
-app = FastAPI(title="Calculadora Solar API")
+app = FastAPI(title="Ephemeris API")
 
 app.add_middleware(
     CORSMiddleware,
