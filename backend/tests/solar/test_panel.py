@@ -62,3 +62,12 @@ def test_annual_energy_does_not_depend_on_longitude() -> None:
     east = optimal_panel_orientation(2024, -34.6, 151.0)
     assert east.annual_kwh_per_m2 == pytest.approx(reference.annual_kwh_per_m2, rel=0.01)
     assert east.annual_tilt_deg == pytest.approx(reference.annual_tilt_deg, abs=3)
+
+
+def test_monthly_energy_adds_up_to_the_annual_total_and_follows_the_seasons() -> None:
+    south = optimal_panel_orientation(2021, -34.6, -58.4)
+    assert len(south.monthly_kwh_per_m2) == 12
+    assert sum(south.monthly_kwh_per_m2) == pytest.approx(south.annual_kwh_per_m2, rel=0.03)
+    assert south.monthly_kwh_per_m2[11] > south.monthly_kwh_per_m2[5]  # diciembre sobre junio
+    north = optimal_panel_orientation(2021, 40.4, -3.7)
+    assert north.monthly_kwh_per_m2[5] > north.monthly_kwh_per_m2[11]

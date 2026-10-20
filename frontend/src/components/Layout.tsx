@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation as useRouterLocation, useSearchParams } from 'react-router-dom'
 import { LocationExtras } from './LocationExtras'
 import { LocationSearch } from './LocationSearch'
+import { ThemeToggle } from './ThemeToggle'
 import { useLocation } from '../context/LocationContext'
 import { useDate } from '../context/DateContext'
 import { shiftDateIso, todayIso } from '../utils/date'
@@ -19,6 +20,10 @@ const NAV_ITEMS = [
   { to: '/eclipses', label: 'Eclipses' },
   { to: '/mareas', label: 'Mareas' },
   { to: '/pascua', label: 'Pascua' },
+  { to: '/lluvia', label: 'Lluvia' },
+  { to: '/nubosidad', label: 'Nubosidad' },
+  { to: '/sol-real', label: 'Sol real' },
+  { to: '/radiacion-real', label: 'Radiación real' },
 ]
 
 const smallButtonStyle = {
@@ -67,7 +72,7 @@ export function Layout() {
           gap: '1rem',
         }}
       >
-        <strong style={{ fontSize: '1.1rem' }}>☀️ Calculadora Solar</strong>
+        <strong style={{ fontSize: '1.1rem' }}>☀️ Ephemeris</strong>
 
         <nav style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
           {NAV_ITEMS.map((item) => (
@@ -137,6 +142,7 @@ export function Layout() {
           >
             {linkCopied ? '✓ Copiado' : '🔗 Enlace'}
           </button>
+          <ThemeToggle />
         </div>
       </header>
 

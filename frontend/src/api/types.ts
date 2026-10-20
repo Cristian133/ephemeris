@@ -254,3 +254,152 @@ export interface TideDayResponse {
   extremes: TideExtremeItem[]
   samples: TideSample[]
 }
+
+/* Etapa 3: meteorología (backend/app/schemas/meteo.py). */
+
+export interface RainDistribution {
+  years_with_data: number
+  mean_mm: number | null
+  median_mm: number | null
+  p10_mm: number | null
+  p90_mm: number | null
+}
+
+export interface RainMonth extends RainDistribution {
+  month: number // 1 = enero
+  mean_rainy_days: number | null
+}
+
+export interface RainYearTotal {
+  year: number
+  total_mm: number | null // null si a la serie le falta algún mes
+}
+
+export interface RainExtremeYear {
+  year: number
+  total_mm: number
+}
+
+export interface RainResponse {
+  latitude: number
+  longitude: number
+  grid_latitude: number
+  grid_longitude: number
+  first_year: number
+  last_year: number
+  rainy_day_threshold_mm: number
+  source: string
+  months: RainMonth[]
+  annual: RainDistribution
+  yearly_totals: RainYearTotal[]
+  wettest_year: RainExtremeYear | null
+  driest_year: RainExtremeYear | null
+}
+
+export interface MeteoPlace {
+  latitude: number
+  longitude: number
+  grid_latitude: number
+  grid_longitude: number
+  first_year: number
+  last_year: number
+  source: string
+}
+
+export interface CloudDistribution {
+  years_with_data: number
+  mean_pct: number | null
+  median_pct: number | null
+  p10_pct: number | null
+  p90_pct: number | null
+}
+
+export interface CloudMonth extends CloudDistribution {
+  month: number // 1 = enero
+  clear_days: number | null
+  partly_days: number | null
+  overcast_days: number | null
+}
+
+export interface CloudResponse extends MeteoPlace {
+  clear_max_pct: number
+  overcast_min_pct: number
+  months: CloudMonth[]
+  annual: CloudDistribution
+}
+
+export interface SunshineDistribution {
+  years_with_data: number
+  mean_hours: number | null
+  median_hours: number | null
+  p10_hours: number | null
+  p90_hours: number | null
+}
+
+/** Horas de sol estimadas desde la radiación (Ångström-Prescott); las de
+ * `SunshineDistribution` son las del modelo del reanálisis. */
+export interface EstimatedSunshine {
+  estimated_mean_hours: number | null
+  estimated_median_hours: number | null
+  estimated_p10_hours: number | null
+  estimated_p90_hours: number | null
+  estimated_relative_pct: number | null
+}
+
+export interface SunshineMonth extends SunshineDistribution, EstimatedSunshine {
+  month: number // 1 = enero
+  astronomical_hours: number
+  relative_pct: number | null
+}
+
+export interface SunshineAnnual extends SunshineDistribution, EstimatedSunshine {
+  astronomical_hours: number
+  relative_pct: number | null
+}
+
+export interface SunshineResponse extends MeteoPlace {
+  angstrom_a: number
+  angstrom_b: number
+  months: SunshineMonth[]
+  annual: SunshineAnnual
+}
+
+export interface RadiationDistribution {
+  years_with_data: number
+  mean_kwh: number | null
+  median_kwh: number | null
+  p10_kwh: number | null
+  p90_kwh: number | null
+}
+
+export interface RadiationMonth extends RadiationDistribution {
+  month: number // 1 = enero
+  clear_sky_kwh: number
+  clearness_index: number | null
+}
+
+export interface RadiationAnnual extends RadiationDistribution {
+  clear_sky_kwh: number
+  clearness_index: number | null
+}
+
+export interface PanelRealSky {
+  azimuth_deg: number
+  tilt_deg: number
+  albedo: number
+  clear_sky_kwh_per_m2: number
+  estimated_kwh_per_m2: number | null
+}
+
+/** De dónde salió la altitud: la pasó el cliente, la informó la fuente para
+ * la celda, o se usó 0 m por defecto. */
+export type ElevationSource = 'user' | 'cell' | 'default'
+
+export interface IrradianceRealResponse extends MeteoPlace {
+  elevation_m: number
+  elevation_source: ElevationSource
+  linke_turbidity: number
+  months: RadiationMonth[]
+  annual: RadiationAnnual
+  panel: PanelRealSky
+}

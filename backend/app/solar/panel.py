@@ -24,7 +24,7 @@ vez, sin iterar en Python.
 
 import calendar
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 import numpy as np
 
@@ -51,7 +51,10 @@ class PanelOrientation:
     `azimuth_deg` es el rumbo hacia el que mira el panel (0°=Norte,
     180°=Sur). Las energías son kWh por m² de panel al año, con el panel
     en la inclinación indicada; `curve` es la energía anual para cada
-    inclinación de 0° a 90° cada 5°.
+    inclinación de 0° a 90° cada 5°. `monthly_kwh_per_m2` es la energía de
+    cada mes (enero a diciembre) con el panel en la inclinación anual óptima;
+    se estima con los días muestreados, así que suma el total anual con un
+    error de pocos por ciento.
     """
 
     azimuth_deg: float
@@ -61,6 +64,7 @@ class PanelOrientation:
     annual_kwh_per_m2: float
     horizontal_kwh_per_m2: float
     curve: list[tuple[float, float]]
+    monthly_kwh_per_m2: list[float]
 
 
 def _plane_power(
@@ -137,6 +141,15 @@ def optimal_panel_orientation(
         winter_tilt, summer_tilt = december_tilt, june_tilt
 
     best = int(annual_kwh.argmax())
+    daily_kwh = power[:, best].reshape(len(sampled_days), _SAMPLES_PER_DAY).sum(axis=1)
+    daily_kwh = daily_kwh * hours_per_sample / 1000
+    sampled_months = np.array(
+        [(date(year, 1, 1) + timedelta(days=int(d))).month for d in sampled_days]
+    )
+    month_lengths = [calendar.monthrange(year, m)[1] for m in range(1, 13)]
+    monthly_kwh = [
+        float(daily_kwh[sampled_months == m].mean() * month_lengths[m - 1]) for m in range(1, 13)
+    ]
     return PanelOrientation(
         azimuth_deg=panel_azimuth,
         annual_tilt_deg=float(_TILTS[best]),
@@ -145,4 +158,5 @@ def optimal_panel_orientation(
         annual_kwh_per_m2=float(annual_kwh[best]),
         horizontal_kwh_per_m2=float(annual_kwh[0]),
         curve=[(float(_TILTS[i]), float(annual_kwh[i])) for i in range(0, 91, _CURVE_STEP)],
+        monthly_kwh_per_m2=monthly_kwh,
     )

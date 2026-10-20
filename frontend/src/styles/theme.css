@@ -1,7 +1,12 @@
 /* Tema base: tokens de color (paleta validada del proyecto, ver
    docs/plan_tecnico.md y la guía de dataviz interna) + reset mínimo.
    Los componentes se escriben contra estos roles, nunca contra hex
-   directo, para que claro/oscuro cambien en un solo lugar. */
+   directo, para que claro/oscuro cambien en un solo lugar.
+
+   El claro es el de `:root`. El oscuro se activa con `data-theme="dark"` en
+   <html>, que siempre pone JavaScript: el script de `index.html` antes del
+   primer dibujo y `ThemeProvider` después, resolviendo la preferencia del
+   usuario (claro, oscuro o la del sistema operativo). */
 
 :root {
   color-scheme: light;
@@ -24,24 +29,22 @@
     system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    --surface-1: #1a1a19;
-    --page-plane: #0d0d0d;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --gridline: #2c2c2a;
-    --axis: #383835;
-    --border: rgba(255, 255, 255, 0.1);
+  --surface-1: #1a1a19;
+  --page-plane: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.1);
 
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #3fb583;
-    --series-4: #a07ce0;
-  }
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #3fb583;
+  --series-4: #a07ce0;
 }
 
 * {

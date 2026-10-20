@@ -11,12 +11,17 @@ import Luna from './pages/Luna'
 import Eclipses from './pages/Eclipses'
 import Mareas from './pages/Mareas'
 import Pascua from './pages/Pascua'
+import Lluvia from './pages/Lluvia'
+import Nubosidad from './pages/Nubosidad'
+import SolReal from './pages/SolReal'
+import RadiacionReal from './pages/RadiacionReal'
 
 /** Una ruta por feature del plan técnico (sección 5): horas de sol
  * (puntos 1+2), trayectoria (punto 3), mediodía (punto 4), irradiancia
  * (punto 5), más crepúsculos, estaciones y panel solar, y los de la
  * etapa 2: Luna, eclipses, mareas teóricas y Pascua. `Layout` comparte
- * la navegación, la ubicación y la fecha. */
+ * la navegación, la ubicación y la fecha. La etapa 3 (meteorología)
+ * son la lluvia, la nubosidad, el sol real y la radiación real. */
 export default function App() {
   return (
     <Routes>
@@ -32,6 +37,10 @@ export default function App() {
         <Route path="eclipses" element={<Eclipses />} />
         <Route path="mareas" element={<Mareas />} />
         <Route path="pascua" element={<Pascua />} />
+        <Route path="lluvia" element={<Lluvia />} />
+        <Route path="nubosidad" element={<Nubosidad />} />
+        <Route path="sol-real" element={<SolReal />} />
+        <Route path="radiacion-real" element={<RadiacionReal />} />
       </Route>
     </Routes>
   )

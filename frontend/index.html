@@ -3,7 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Calculadora Solar</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Ephemeris</title>
+    <script>
+      // Aplica el tema antes del primer dibujo, para que no parpadee. Misma
+      // lógica que utils/theme.ts: 'light' u 'dark' guardados, o el del sistema.
+      (function () {
+        var saved = null
+        try {
+          saved = localStorage.getItem('ephemeris:theme')
+        } catch (e) {}
+        var dark =
+          saved === 'dark' ||
+          (saved !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
