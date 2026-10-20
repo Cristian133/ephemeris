@@ -8,7 +8,8 @@ latitud/longitud del observador y la fecha. Pensada como base escalable
 para etapas futuras (meteorología).
 
 **Estado actual: etapas 1 (Sol) y 2 (Luna, eclipses, calendario y mareas
-teóricas) completas.** Ver
+teóricas) completas; etapa 3 (meteorología) completa: lluvia, nubosidad, sol
+real y radiación real.** Ver
 [`docs/plan_tecnico.md`](docs/plan_tecnico.md) para la arquitectura, las
 fórmulas por módulo, la precisión verificada y el plan de las etapas 2 y 3.
 
@@ -27,6 +28,10 @@ fórmulas por módulo, la precisión verificada y el plan de las etapas 2 y 3.
 | Eclipses | `GET /eclipses/anio` | Eclipses de Sol y de Luna del año (condiciones globales; visibilidad lunar por ubicación) |
 | Mareas | `GET /mareas/dia` | Marea de equilibrio del Sol y la Luna, pleamares y bajamares teóricas, mareas vivas y muertas |
 | Pascua | `GET /calendario/pascua` | Pascua occidental y ortodoxa |
+| Lluvia | `GET /meteo/lluvia` | Lluvia mensual y anual de un período (por defecto 1991-2020): media, mediana, percentiles 10 y 90, días de lluvia, años más seco y más húmedo. Reanálisis ERA5 vía Open-Meteo |
+| Nubosidad | `GET /meteo/nubosidad` | Nubosidad media mensual y anual, y días despejados, parciales y cubiertos |
+| Sol real | `GET /meteo/horas-sol` | Horas de sol por mes y año frente a la duración astronómica del día, e insolación relativa; estimadas desde la radiación (calibrada con ocho estaciones) porque el modelo del reanálisis sobreestima |
+| Radiación real | `GET /meteo/irradiancia-real` | Radiación solar real por mes y año frente a la de cielo despejado, índice de claridad y energía anual estimada de un panel fijo con el cielo real |
 
 La documentación interactiva de la API está en `/docs` (Swagger) con el
 backend corriendo.
@@ -64,6 +69,7 @@ cd frontend && npm ci && npm run dev
 | Variable | Dónde | Por defecto | Uso |
 |---|---|---|---|
 | `CORS_ORIGINS` | backend | `http://localhost:5173,http://127.0.0.1:5173` | Orígenes (separados por coma) que pueden llamar a la API. En producción, el dominio del frontend |
+| `METEO_DB_PATH` | backend | `data/meteo.sqlite` | Archivo SQLite donde se guardan las series meteorológicas ya pedidas (etapa 3) |
 | `VITE_API_URL` | frontend | `http://localhost:8000` | URL base de la API |
 
 ## Desarrollo
@@ -73,7 +79,7 @@ cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv
 cd frontend && npm run lint && npm test && npm run build
 ```
 
-La CI (`.github/workflows/ci.yml`) corre lo mismo. Los tests del motor
+La CI (`.github/workflows/ci.yml`) corre lo mismo. `backend/scripts/validar_estaciones.py` contrasta lluvia y horas de sol de la etapa 3 con ocho estaciones del SMN y la AEMET (usa la red); con `--ajustar` recalcula los coeficientes de las horas de sol y con `--radiacion` contrasta la radiación con una red de piranómetros de la Pampa Húmeda. Los tests del motor
 incluyen los ejemplos numéricos de Meeus y comparaciones contra astropy
 (orto/ocaso del Sol y de la Luna, posición lunar, fases, perigeo y apogeo,
 eclipses reales de 2023 a 2026): ver `backend/tests/solar/test_reference.py`,

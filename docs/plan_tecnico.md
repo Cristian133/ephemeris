@@ -1,6 +1,6 @@
 # Calculadora Solar — Plan Técnico
 
-Estado: **etapas 1 (Sol) y 2 (Luna, eclipses, calendario y mareas teóricas) implementadas y verificadas.** Las secciones 3 a 6 describen lo construido; la 7, lo que sigue.
+Estado: **etapas 1 (Sol) y 2 (Luna, eclipses, calendario y mareas teóricas) implementadas y verificadas; etapa 3 (meteorología) implementada (sección 7).** Las secciones 3 a 6 describen lo construido; la 7, lo que sigue.
 
 ## 1. Decisiones tomadas
 
@@ -156,9 +156,61 @@ La salida/puesta de la Luna se resuelve explorando la altitud cada 10 minutos y 
 - **Rango de años:** fases y apsides, 1000-3000 (el error crece lejos del presente); eclipses, 1800-2200; Pascua, 1583-9999.
 - **Posición lunar:** la serie truncada del cap. 47 tiene ~10" en longitud; alcanza para todo lo anterior pero no para ocultaciones de estrellas ni eclipses solares locales de precisión.
 
-## 7. Etapa 3 — meteorología
+## 7. Etapa 3 — meteorología (implementada)
 
-Fuera del alcance de los libros disponibles: requiere integración con fuentes de datos externas (ej. Open-Meteo, NASA POWER) para series históricas de lluvia/nubosidad. Es trabajo de integración de datos, no de cálculo astronómico — se planifica en detalle cuando se llegue a esa etapa.
+Datos de la API histórica de Open-Meteo (reanálisis ERA5, desde 1940), consumidos desde el backend. Es de uso personal, así que el caché es un archivo SQLite (`METEO_DB_PATH`) y no hay servicios nuevos en Docker Compose.
+
+### 7.1 Estructura (`backend/app/meteo/`)
+- `grid.py`: celdas de 0.25° (la resolución nativa de ERA5); se consulta y se guarda por celda, no por punto.
+- `client.py`: cliente HTTP con reintentos y espera creciente ante 429 y 5xx. Pide `timezone=auto`: cada fila es un día local del lugar.
+- `store.py` y `service.py`: caché por celda y año completo, más la altitud de la celda; solo se piden los tramos de años que faltan. Solo admite años ya terminados (el año en curso está incompleto y ERA5 tiene unos días de demora).
+- `aggregate.py`: tabla año × mes. La suma exige el mes completo y sin huecos; la media tolera huecos.
+- `rain.py`: estadísticas de lluvia. Día de lluvia = 1 mm o más (criterio de la OMM); un año entra en las cifras anuales solo con sus 12 meses completos.
+- `sky.py`: nubosidad (día despejado: hasta 20 % de nubes; cubierto: desde 80 %) y horas de sol. La insolación relativa es la media de horas de sol sobre la duración astronómica del día, que sale de `app.solar.events` para el centro de la celda y un año de referencia (la duración casi no cambia entre años). En un día polar cuenta 24 h o 0 h; sin sol posible, la insolación es `None`. `estimated_sunshine_statistics` estima las horas de sol desde la radiación con la relación de Ångström-Prescott (kt = a + b·n/N) con a = 0.29 y b = 0.49, ajustados a ocho estaciones (los de FAO-56, a = 0.25 y b = 0.50, quedan como referencia en `FAO_ANGSTROM_*`), porque la duración de sol efectivo del reanálisis sobreestima mucho (ver 7.3). La radiación extraterrestre de cada día sale de `app.solar.insolation.extraterrestrial_daily_kwh`.
+- `radiation.py`: radiación global horizontal real (onda corta del reanálisis, en kWh/m²) frente a la de cielo despejado, e índice de claridad (real / despejado). La energía de cielo despejado de cada día del año sale de `app.solar.insolation` (vectorizado, misma cadena que `panel.py`) para el centro de la celda, con la altitud y la turbidez de Linke indicadas. `estimate_panel_real_sky` aplica a la energía mensual del panel el índice de claridad de cada mes.
+- Las estadísticas comunes (media, mediana, percentiles 10 y 90 entre años) viven en `aggregate.py`.
+
+### 7.2 Endpoints y páginas
+| Fase | Endpoint | Estado |
+|---|---|---|
+| 2 | `GET /meteo/lluvia` (`first_year`, `last_year`; por defecto 1991-2020) y página Lluvia | implementada |
+| 3 | `GET /meteo/nubosidad` y `GET /meteo/horas-sol` (con la versión del modelo y la estimada desde la radiación), con las páginas Nubosidad y Sol real | implementada; horas de sol y lluvia contrastadas con ocho estaciones (7.3) |
+| 4 | `GET /meteo/irradiancia-real` (más `elevation_m`, `linke_turbidity` y `albedo`; sin `elevation_m` usa la altitud de la celda) y página Radiación real | implementada |
+
+### 7.3 Verificación y límites
+- El motor se prueba con series sintéticas de resultado calculable a mano y con respuestas simuladas de la fuente; no hay tests que dependan de la red.
+- **Contraste con ocho estaciones medidas** (`backend/scripts/validar_estaciones.py`, período 1991-2020; entre paréntesis la diferencia con lo medido; las horas de sol son el total anual):
+
+  | Estación | Lluvia medida / ERA5 (mm) | Sol medido (h) | Modelo ERA5 | Estimado, FAO-56 | Estimado, calibrado |
+  |---|---|---|---|---|---|
+  | Buenos Aires, Obs. Central | 1258 / 1071 (-15 %) | 2384 | 3498 (+47 %) | 2752 (+15 %) | 2447 (+3 %) |
+  | Córdoba, Observatorio | 816 / 904 (+11 %) | 2562 | 3655 (+43 %) | 2814 (+10 %) | 2510 (-2 %) |
+  | Madrid, Retiro (AEMET) | 416 / 408 (-2 %) | 2744 | 3783 (+38 %) | 3096 (+13 %) | 2795 (+2 %) |
+  | Mendoza, Aeropuerto | 238 / 561 (+136 %) | 2976 | 3851 (+29 %) | 3289 (+11 %) | 2996 (+1 %) |
+  | Tucumán | 1010 / 1181 (+17 %) | 2250 | 3410 (+52 %) | 2294 (+2 %) | 1980 (-12 %) |
+  | Ushuaia, Aeropuerto | 458 / 843 (+84 %) | 1404 | 2985 (+113 %) | 2015 (+44 %) | 1694 (+21 %) |
+  | Salta, Aeropuerto | 738 / 2240 (+203 %) | 2287 | 3708 (+62 %) | 2586 (+13 %) | 2278 (0 %) |
+  | Bariloche, Aeropuerto | 812 / 1018 (+25 %) | 2558 | 3535 (+38 %) | 2974 (+16 %) | 2674 (+5 %) |
+
+- **Fuentes de la referencia, con cautela.** Las normales salen de las tablas climáticas de Wikipedia, que citan al SMN y a la AEMET; no se pudo leer el portal del SMN. Son fuentes secundarias y tienen problemas conocidos: los períodos de las horas de sol no coinciden (SMN 1991-2020 en Buenos Aires, Córdoba y Mendoza; solo 1991-2000 en Tucumán y Salta; OMM 1981-2010 en Bariloche; AEMET 1981-2010 en Madrid; Ushuaia cita 1901-1990 para el porcentaje de sol); Mendoza tiene dos estaciones en la ciudad y el Observatorio da 2636 h, un 13 % menos que el Aeropuerto; en Bariloche la suma mensual (2558 h) no coincide con el total que da la página (2595 h); la página de Córdoba avisa de texto sin verificar; y las horas de sol de Tucumán tienen julio por encima de junio, que llama la atención. Antes de citar estas cifras conviene cotejarlas con las normales oficiales.
+- **Lluvia: ERA5 no sirve en terreno complicado.** En ciudades llanas el total anual quedó entre -15 % y +17 % (Buenos Aires, Córdoba, Madrid, Tucumán), pero en zonas montañosas, áridas o subpolares sobreestima mucho: Mendoza +136 %, Salta +203 %, Ushuaia +84 %, Bariloche +25 %. La celda de ~25 km promedia la montaña con el valle. No se calibra (el error cambia de signo y de tamaño según el relieve); la página lo advierte. Una conclusión anterior de este documento, que el error anual estaba entre -15 % y +11 % sin sentido fijo, se había sacado de tres ciudades llanas y no se sostiene. Los meses secos se desvían más (Córdoba, de mayo a agosto: 1.7 a 2.4 veces lo medido).
+- **Horas de sol: el modelo del reanálisis sobreestima 29-62 %** en siete estaciones y +113 % en Ushuaia (`sunshine_duration` es un valor modelado, no una medición). La estimación desde la radiación, que el reanálisis reproduce mucho mejor, con los coeficientes de FAO-56 (a = 0.25, b = 0.50) lo reduce a +2/+16 % (+44 % en Ushuaia).
+- **Coeficientes calibrados.** Con `scripts/validar_estaciones.py --ajustar` se regresa el índice de claridad mensual sobre la fracción de sol medida en las ocho estaciones (96 puntos): a = 0.294, b = 0.487, con a + b = 0.78, la suma clásica de Ångström. Se adoptan a = 0.29 y b = 0.49. Para que el ajuste no se valide sobre sus propios datos, se hizo validación cruzada (cada estación queda fuera del ajuste): error anual medio de 7.4 % (sesgo medio +2.4 %) contra 15.4 % con FAO-56. Seis de las ocho estaciones quedan dentro de ±4 %; los peores casos son Tucumán (-15 %, cuya referencia es de 1991-2000 y tiene el julio dudoso) y Ushuaia (+31 %, clima subpolar y referencia antigua). Los datos de ajuste son argentinos y de Madrid: fuera de ese rango de climas (trópico húmedo, monzón, alta latitud norte) los coeficientes no están comprobados. Volver a los de FAO-56 es cambiar dos constantes en `app/meteo/sky.py`.
+- Nubosidad de Buenos Aires (1991-2020): 47 % anual, más cubierta en invierno (junio, 56 %) que en verano (enero, 38 %). Coincide en el patrón estacional con los días despejados y cubiertos que reporta la referencia, pero no se contrastó numéricamente: aquella cuenta días según otro criterio.
+- **Radiación real: contrastada con una red de piranómetros, en la Pampa Húmeda.** La red solarimétrica de GERSolar (UNLu) e INTA mide con solarímetros de primera calidad (Kipp & Zonen y Eppley, calibrados cada dos años); su atlas preliminar (2010-2018, diez estaciones) publica la distribución de los días según el índice de claridad kt (irradiación diaria sobre extraterrestre). Con `scripts/validar_estaciones.py --radiacion`, la de ERA5 en seis puntos de la zona (Luján, Pergamino, Paraná, Rafaela, Manfredi y Anguil, con coordenadas aproximadas) queda a menos de 3.7 puntos porcentuales de la medida en todas las clases:
+
+  | Días con kt | < 0.3 (cubierto) | 0.3-0.55 | 0.55-0.7 | >= 0.7 (despejado) |
+  |---|---|---|---|---|
+  | Medido (red GERSolar, toda la red) | 15 % | 24 % | 35 % | 26 % |
+  | ERA5, Luján | 12.8 % | 23.9 % | 36.8 % | 26.5 % |
+  | ERA5, los seis puntos juntos | 11.3 % | 23.1 % | 37.1 % | 28.5 % |
+
+  ERA5 tiene algo menos de días cubiertos (11 % contra 15 %), lo que explica que su radiación media salga algo alta, coherente con el +6 % que se vio en Buenos Aires. Las cartas de enero y julio del mismo atlas (isolíneas cada 0.5 kWh/m² por día) dan 6.8-7.8 y 2.0-2.5 kWh/m² por día; ERA5 da 7.2-7.8 en enero y 2.4-2.5 en julio en Luján y Pergamino (2.7-3.0 más al oeste, donde la carta solo tiene una clase abierta de 2.5 o más): coherente, pero la resolución del mapa es gruesa. Límites: es una sola zona (llanura templada), el porcentaje medido es el de toda la red y no el de cada punto, y no se pudo confirmar la lista de estaciones. No cubre zonas montañosas ni tropicales. El atlas de energía solar de la Argentina (Grossi Gallegos y Righini, 2007) trae cartas mensuales de irradiación y de heliofanía para todo el país, pero como mapas sin tablas: sirve de control grueso, no para validar.
+- **Panel con cielo real: aproximado.** Supone que las nubes restan al panel inclinado lo mismo que al plano horizontal (no separa directa y difusa) y no descuenta pérdidas del sistema. Para el panel óptimo da 2025 kWh/m² al año en Madrid y 1956 en Buenos Aires. Es una referencia, no un dimensionamiento.
+- **Altitud de la celda.** Open-Meteo informa la altitud del punto que resuelve en cada respuesta; el caché la guarda por celda (tabla `cells`) y es la que usa `GET /meteo/irradiancia-real` si no se pasa `elevation_m`. Los datos pedidos antes de que se guardara no la tienen: se recupera con una consulta mínima de un día, una sola vez. La respuesta trae `elevation_source` (`user`, `cell` o `default`); si la fuente no responde solo para dar la altitud, no se rechaza el pedido (los datos están en el caché) sino que se usa 0 m y la página lo advierte. Efecto en el índice de claridad anual: Buenos Aires (20 m) 0.78 y sin cambio; Madrid (689 m) 0.84 → 0.83; La Paz (3972 m) 0.86 → 0.67, que es donde el cielo despejado a nivel del mar subestimaba el techo. La altitud es la del punto que resuelve la fuente (un modelo digital de terreno), que puede diferir de la del centro de una ciudad.
+- La estimación del panel casi no depende de la altitud (La Paz: 2324 kWh/m² con 0 m y con 3972 m): al subir el techo de cielo despejado, el índice de claridad baja en la misma proporción y se compensan.
+- La primera consulta de un lugar tarda unos 3 s (30 años de datos); la segunda sale del caché en ~0.1 s.
+- Open-Meteo gratuito es solo para uso no comercial.
 
 ## 8. Backlog de la etapa 1 (completado)
 

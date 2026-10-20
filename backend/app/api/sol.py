@@ -5,7 +5,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.api.params import DateParam, Latitude, Longitude, NumSamples
+from app.api.params import (
+    Albedo,
+    DateParam,
+    Elevation,
+    Latitude,
+    LinkeTurbidity,
+    Longitude,
+    NumSamples,
+)
 from app.schemas.sol import (
     AltitudeCrossing,
     AnnualSunResponse,
@@ -52,31 +60,6 @@ Temperature = Annotated[
         description="Temperatura del aire en °C, para la refracción (estándar: 10)",
     ),
 ]
-Elevation = Annotated[
-    float,
-    Query(
-        ge=-500,
-        le=9000,
-        description="Altitud del lugar sobre el nivel del mar, en metros",
-    ),
-]
-LinkeTurbidity = Annotated[
-    float,
-    Query(
-        ge=1,
-        le=8,
-        description=(
-            "Factor de turbidez de Linke (1 = aire limpio y seco; 2-5 típico; "
-            "más en ciudades e industria)"
-        ),
-    ),
-]
-Albedo = Annotated[
-    float,
-    Query(ge=0, le=1, description="Reflectividad del suelo (pasto ~0.2, nieve fresca ~0.8)"),
-]
-
-
 # Los cálculos de un año completo son puros y deterministas, así que se
 # cachean por (ubicación, parámetros). La ubicación se redondea a 4
 # decimales (~11 m): evita que coordenadas casi idénticas llenen el cache
