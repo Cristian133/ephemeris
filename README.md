@@ -30,7 +30,7 @@ fórmulas por módulo, la precisión verificada y el plan de las etapas 2 y 3.
 | Pascua | `GET /calendario/pascua` | Pascua occidental y ortodoxa |
 | Lluvia | `GET /meteo/lluvia` | Lluvia mensual y anual de un período (por defecto 1991-2020): media, mediana, percentiles 10 y 90, días de lluvia, años más seco y más húmedo. Reanálisis ERA5 vía Open-Meteo |
 | Nubosidad | `GET /meteo/nubosidad` | Nubosidad media mensual y anual, y días despejados, parciales y cubiertos |
-| Sol real | `GET /meteo/horas-sol` | Horas de sol por mes y año frente a la duración astronómica del día, e insolación relativa; estimadas desde la radiación (calibrada con ocho estaciones) porque el modelo del reanálisis sobreestima |
+| Sol real | `GET /meteo/horas-sol` | Horas de sol por mes y año frente a la duración astronómica del día, e insolación relativa; estimadas desde la radiación (calibrada con veinte estaciones) porque el modelo del reanálisis sobreestima |
 | Radiación real | `GET /meteo/irradiancia-real` | Radiación solar real por mes y año frente a la de cielo despejado, índice de claridad y energía anual estimada de un panel fijo con el cielo real |
 
 La documentación interactiva de la API está en `/docs` (Swagger) con el
@@ -79,7 +79,7 @@ cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv
 cd frontend && npm run lint && npm test && npm run build
 ```
 
-La CI (`.github/workflows/ci.yml`) corre lo mismo. `backend/scripts/validar_estaciones.py` contrasta lluvia y horas de sol de la etapa 3 con ocho estaciones del SMN y la AEMET (usa la red); con `--ajustar` recalcula los coeficientes de las horas de sol y con `--radiacion` contrasta la radiación con una red de piranómetros de la Pampa Húmeda. Los tests del motor
+La CI (`.github/workflows/ci.yml`) corre lo mismo. `backend/scripts/validar_estaciones.py` contrasta lluvia y horas de sol de la etapa 3 con ocho estaciones del SMN y la AEMET (usa la red); con `--asia` suma once ciudades de Japón y Hong Kong (y la nubosidad y la radiación de esta), con `--ajustar` recalcula los coeficientes de las horas de sol con las veinte estaciones y con `--radiacion` contrasta la radiación con una red de piranómetros de la Pampa Húmeda. Los tests del motor
 incluyen los ejemplos numéricos de Meeus y comparaciones contra astropy
 (orto/ocaso del Sol y de la Luna, posición lunar, fases, perigeo y apogeo,
 eclipses reales de 2023 a 2026): ver `backend/tests/solar/test_reference.py`,

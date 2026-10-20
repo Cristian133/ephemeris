@@ -29,13 +29,17 @@ DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 # llega al suelo (índice de claridad kt) crece linealmente con la fracción de
 # horas de sol, kt = a + b·n/N.
 #
-# Coeficientes ajustados con ocho estaciones del SMN y la AEMET (scripts/
-# validar_estaciones.py, `--ajustar`): en validación cruzada, dejando cada
-# estación fuera del ajuste, el error anual medio es de 7 %, contra 15 % con los
-# de FAO-56. Su suma (0.78) es la clásica de Ångström. Salieron de datos
-# argentinos y de Madrid: fuera de ese rango de climas no están comprobados.
-ANGSTROM_A = 0.29
-ANGSTROM_B = 0.49
+# Coeficientes ajustados con veinte estaciones del SMN, la AEMET, la JMA y el
+# HKO (Argentina, España, Japón y Hong Kong; scripts/validar_estaciones.py,
+# `--ajustar`). La relación depende del clima: un ajuste hecho solo con
+# Argentina y Madrid subestimaba 11 % en Asia, y uno hecho solo con Asia
+# sobreestimaba 16 % en Argentina y Madrid. Con las veinte juntas, en
+# validación cruzada (cada estación fuera del ajuste) el error anual medio es
+# de 9 % y el sesgo medio de +0.3 %, contra 11 % y +11 % con los de FAO-56. Su
+# suma (0.78) es la clásica de Ångström. No están comprobados en trópico
+# húmedo continental, desierto ni latitudes altas del norte.
+ANGSTROM_A = 0.27
+ANGSTROM_B = 0.51
 # Los de FAO-56, que no se ajustan a ningún clima en particular; la referencia.
 FAO_ANGSTROM_A = 0.25
 FAO_ANGSTROM_B = 0.50
@@ -164,7 +168,7 @@ def estimated_sunshine_statistics(
 ) -> SunshineStatistics:
     """Horas de sol estimadas a partir de la radiación, con Ångström-Prescott.
 
-    La duración de sol efectivo que modela el reanálisis queda 30-60 % por
+    La duración de sol efectivo que modela el reanálisis queda 30-85 % por
     encima de lo medido con heliógrafo (más del doble en un clima subpolar),
     pero su radiación es mucho más fiel. Invertir la relación de
     Ångström-Prescott sobre la radiación da horas de sol mucho más cercanas

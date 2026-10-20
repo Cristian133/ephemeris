@@ -28,11 +28,13 @@ export default function Lluvia() {
         <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>{location.displayName}</p>
         <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           Estadísticas del período elegido, a partir del reanálisis ERA5: el valor típico de una
-          celda de unos 25 km, no el de una estación. Contrastado con ocho estaciones del SMN y la
-          AEMET, en ciudades llanas el total anual quedó entre un 15 % por debajo y un 17 % por
-          encima. <strong>En zonas montañosas, áridas o subpolares sobreestima mucho</strong>: en
-          Mendoza y Salta dio de 2 a 3 veces lo medido, y en Ushuaia un 84 % más. La primera consulta
-          de un lugar puede tardar unos segundos; después queda guardada.
+          celda de unos 25 km, no el de una estación. Contrastado con 20 estaciones, en ciudades
+          llanas el total anual suele quedar entre -15 % y +17 % (en la mayoría de las japonesas,
+          entre -9 % y +9 %).{' '}
+          <strong>En zonas montañosas, áridas o subpolares sobreestima mucho</strong>: en Mendoza y
+          Salta dio de 2 a 3 veces lo medido, y en Ushuaia un 84 % más. En zonas de monzón y
+          tifones subestima: Hong Kong -28 % y Naha -19 %. La primera consulta de un lugar puede
+          tardar unos segundos; después queda guardada.
         </p>
         <PeriodControls
           firstYear={q.firstYear}

@@ -125,7 +125,7 @@ def test_angstrom_prescott_inverts_the_clearness_index() -> None:
 
 
 def test_angstrom_coefficients_are_the_calibrated_ones_with_the_classic_sum() -> None:
-    assert (ANGSTROM_A, ANGSTROM_B) == (0.29, 0.49)
+    assert (ANGSTROM_A, ANGSTROM_B) == (0.27, 0.51)
     assert pytest.approx(0.78) == ANGSTROM_A + ANGSTROM_B  # suma clásica de Ångström
     assert (FAO_ANGSTROM_A, FAO_ANGSTROM_B) == (0.25, 0.50)
 

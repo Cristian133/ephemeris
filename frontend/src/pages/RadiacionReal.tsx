@@ -32,9 +32,9 @@ export default function RadiacionReal() {
           que llegaría con cielo despejado. El índice de claridad es el cociente: 1 sería un cielo
           limpio y baja con las nubes y la turbidez. En la Pampa Húmeda, la distribución de días
           según su claridad coincide con la medida por una red de piranómetros dentro de 4 puntos
-          porcentuales; ERA5 tiene algo menos de días cubiertos (11 % contra 15 %), así que la
-          radiación media puede salir algo alta. No está contrastada en zonas montañosas ni
-          tropicales.
+          porcentuales y la radiación media puede salir algo alta. <strong>En Hong Kong, con
+          monzón y aire con aerosoles, ERA5 dio un 19 % más de radiación que lo medido</strong>:
+          el sesgo depende de la región. No está contrastada en zonas montañosas.
         </p>
         {data && (
           <p

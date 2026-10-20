@@ -29,7 +29,10 @@ export default function Nubosidad() {
         <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           Cobertura de nubes media de cada mes del período, a partir del reanálisis ERA5 (una celda
           de unos 25 km, no una estación). Un día se cuenta como despejado si su nubosidad media es
-          de hasta 20 %, y como cubierto si es de 80 % o más.
+          de hasta 20 %, y como cubierto si es de 80 % o más. Contrastada con una sola estación
+          (Hong Kong, observación visual del Observatorio, 1991-2020), la nubosidad anual de ERA5 fue
+          de 64 % contra 68 % medido, con un error medio mensual de 6 puntos: de octubre a enero
+          quedó entre 11 y 14 puntos por debajo. Con una estación no se puede generalizar.
         </p>
         <PeriodControls
           firstYear={q.firstYear}
