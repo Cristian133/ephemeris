@@ -20,6 +20,10 @@ const NAV_ITEMS = [
   { to: '/mareas', label: 'Mareas' },
   { to: '/pascua', label: 'Pascua' },
 ]
+  { to: '/lluvia', label: 'Lluvia' },
+  { to: '/nubosidad', label: 'Nubosidad' },
+  { to: '/sol-real', label: 'Sol real' },
+  { to: '/radiacion-real', label: 'Radiación real' },
 
 const smallButtonStyle = {
   padding: '0.4rem 0.6rem',

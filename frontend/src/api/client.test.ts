@@ -9,6 +9,10 @@ import {
   getMoonDay,
   getMoonPhases,
   getPanel,
+  getClouds,
+  getRain,
+  getRealIrradiance,
+  getSunshine,
   getSeasons,
   getTides,
   getTrajectory,
@@ -143,5 +147,29 @@ describe('client get', () => {
   it('un error de red se propaga tal cual', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
     await expect(getSeasons(2024)).rejects.toThrow(TypeError)
+  })
+})
+
+describe('endpoints meteorológicos', () => {
+  it('piden su ruta con el período', async () => {
+    const fetchMock = mockFetch({ ok: true, json: async () => ({}) })
+    const period = { latitude: -34.6, longitude: -58.4, first_year: 1991, last_year: 2020 }
+    await getRain(period)
+    await getClouds(period)
+    await getSunshine(period)
+    await getRealIrradiance(period)
+    const urls = fetchMock.mock.calls.map((call) => new URL(call[0] as string))
+    expect(urls.map((u) => u.pathname)).toEqual([
+      '/meteo/lluvia',
+      '/meteo/nubosidad',
+      '/meteo/horas-sol',
+      '/meteo/irradiancia-real',
+    ])
+    expect(Object.fromEntries(urls[0].searchParams)).toEqual({
+      latitude: '-34.6',
+      longitude: '-58.4',
+      first_year: '1991',
+      last_year: '2020',
+    })
   })
 })

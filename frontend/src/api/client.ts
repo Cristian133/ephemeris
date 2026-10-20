@@ -1,16 +1,20 @@
 import type {
   AnnualSunResponse,
   ApsidesResponse,
+  CloudResponse,
   DailySunResponse,
   EasterResponse,
   EclipsesResponse,
+  IrradianceRealResponse,
   IrradianceResponse,
   MoonDayResponse,
   MoonPhasesResponse,
   MoonTrajectoryResponse,
   PanelResponse,
+  RainResponse,
   SeasonsResponse,
   SolarNoonResponse,
+  SunshineResponse,
   TideDayResponse,
   TrajectoryResponse,
   TwilightResponse,
@@ -137,4 +141,27 @@ export function getEaster(year: number): Promise<EasterResponse> {
 
 export function getTides({ latitude, longitude, date }: LocationDate): Promise<TideDayResponse> {
   return get('/mareas/dia', { latitude, longitude, date })
+}
+
+export interface MeteoPeriod {
+  latitude: number
+  longitude: number
+  first_year: number
+  last_year: number
+}
+
+export function getRain(params: MeteoPeriod): Promise<RainResponse> {
+  return get('/meteo/lluvia', { ...params })
+}
+
+export function getClouds(params: MeteoPeriod): Promise<CloudResponse> {
+  return get('/meteo/nubosidad', { ...params })
+}
+
+export function getSunshine(params: MeteoPeriod): Promise<SunshineResponse> {
+  return get('/meteo/horas-sol', { ...params })
+}
+
+export function getRealIrradiance(params: MeteoPeriod): Promise<IrradianceRealResponse> {
+  return get('/meteo/irradiancia-real', { ...params })
 }
