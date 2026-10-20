@@ -217,7 +217,7 @@ def test_horas_sol_adds_the_estimate_from_radiation(service: FakeService) -> Non
     body = client.get(
         "/meteo/horas-sol", params={**_BA, "first_year": 2021, "last_year": 2022}
     ).json()
-    assert (body["angstrom_a"], body["angstrom_b"]) == (0.29, 0.49)
+    assert (body["angstrom_a"], body["angstrom_b"]) == (0.27, 0.51)
     for month in body["months"]:
         # En junio la radiación del dato de prueba roza el techo y la estimación
         # se corta en el día completo, de ahí el `<=`.

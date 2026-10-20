@@ -40,13 +40,16 @@ export default function SolReal() {
             paddingLeft: '0.75rem',
           }}
         >
-          Las horas de sol que modela el reanálisis directamente quedaron entre un 29 % y un 62 %
-          por encima de lo medido con heliógrafo en siete estaciones de Argentina y España, y más del
-          doble en Ushuaia. Por eso aquí se <strong>estiman a partir de la radiación</strong>, que el
-          reanálisis reproduce mucho mejor (relación de Ångström-Prescott con a = {data?.angstrom_a ?? 0.29} y
-          b = {data?.angstrom_b ?? 0.49}, calibrados con esas estaciones). En validación cruzada el
-          error anual medio fue de un 7 %; los peores casos fueron Tucumán (un 15 % por debajo) y
-          Ushuaia (un 31 % por encima). Fuera de ese rango de climas no está comprobada.
+          Las horas de sol que modela el reanálisis directamente quedaron entre un 29 % y un 84 %
+          por encima de lo medido con heliógrafo en 19 de 20 estaciones de Argentina, España, Japón y
+          Hong Kong, y más del doble en Ushuaia. Por eso aquí se{' '}
+          <strong>estiman a partir de la radiación</strong>, que el reanálisis reproduce mejor
+          (relación de Ångström-Prescott con a = {data?.angstrom_a ?? 0.27} y b ={' '}
+          {data?.angstrom_b ?? 0.51}, calibrados con esas veinte estaciones). En validación cruzada
+          el error anual medio fue de un 9 %, con peores casos en Ushuaia (un 31 % por encima),
+          Sapporo (18 % por encima), Kagoshima (15 % por debajo) y Tokio (14 % por debajo). La
+          relación cambia con el clima: un ajuste hecho solo con Argentina y Madrid subestimaba 11 %
+          en Asia. No está comprobada en trópico húmedo continental ni en desierto.
         </p>
         <PeriodControls
           firstYear={q.firstYear}
