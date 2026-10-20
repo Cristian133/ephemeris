@@ -20,4 +20,14 @@ Módulos (ver docs/plan_tecnico.md, sección 4):
   events.py). Hecho.
 - panel.py: inclinación y orientación óptimas de un panel fijo (directa,
   difusa y reflejada; usa irradiance.py). Hecho.
+- calendars.py: Pascua, día de la semana y día del año (Meeus, caps. 7-8).
+  Hecho.
+- moon.py: posición de la Luna, paralaje, iluminación, salida y puesta
+  (Meeus, caps. 47, 48, 40 y 15). Hecho.
+- phases.py: fases principales de la Luna (Meeus, cap. 49). Hecho.
+- apsides.py: perigeo y apogeo (Meeus, cap. 50). Hecho.
+- eclipses.py: eclipses de Sol y de Luna, condiciones globales (Meeus,
+  cap. 54). Hecho.
+- tides.py: marea de equilibrio del Sol y la Luna. Hecho.
+- *_terms.py: tablas de coeficientes de Meeus, solo datos.
 """

@@ -1,5 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, getDailySun, getIrradiance, getPanel, getSeasons, getTrajectory } from './client'
+import {
+  ApiError,
+  getApsides,
+  getDailySun,
+  getEaster,
+  getEclipses,
+  getIrradiance,
+  getMoonDay,
+  getMoonPhases,
+  getPanel,
+  getSeasons,
+  getTides,
+  getTrajectory,
+} from './client'
 
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   const fn = vi.fn().mockResolvedValue(response)
@@ -43,6 +56,38 @@ describe('client get', () => {
     const panel = new URL(fetchMock.mock.calls[1][0] as string)
     expect(panel.searchParams.get('albedo')).toBe('0.8')
     expect(panel.searchParams.get('elevation_m')).toBe('650')
+  })
+
+  it('los endpoints de la etapa 2 usan las rutas y parametros del backend', async () => {
+    const fetchMock = mockFetch({ ok: true, json: async () => ({}) })
+    const where = { latitude: -34.6, longitude: -58.4, date: '2026-10-19' }
+    await getMoonDay(where)
+    await getTides(where)
+    await getMoonPhases(2026)
+    await getApsides(2026)
+    await getEaster(2026)
+    const urls = fetchMock.mock.calls.map((call) => new URL(call[0] as string))
+    expect(urls.map((u) => u.pathname)).toEqual([
+      '/luna/dia',
+      '/mareas/dia',
+      '/luna/fases',
+      '/luna/apsides',
+      '/calendario/pascua',
+    ])
+    expect(urls[0].searchParams.get('date')).toBe('2026-10-19')
+    expect(urls[2].searchParams.get('year')).toBe('2026')
+  })
+
+  it('getEclipses manda la ubicacion solo si se la pasa', async () => {
+    const fetchMock = mockFetch({ ok: true, json: async () => ({}) })
+    await getEclipses(2026)
+    await getEclipses(2026, { latitude: 0, longitude: 0 })
+    const without = new URL(fetchMock.mock.calls[0][0] as string)
+    const withLocation = new URL(fetchMock.mock.calls[1][0] as string)
+    expect(without.pathname).toBe('/eclipses/anio')
+    expect(without.searchParams.has('latitude')).toBe(false)
+    expect(withLocation.searchParams.get('latitude')).toBe('0')
+    expect(withLocation.searchParams.get('longitude')).toBe('0')
   })
 
   it('latitud/longitud 0 no se pierden al serializar', async () => {

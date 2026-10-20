@@ -70,10 +70,13 @@ export function SunPathChart({
   data,
   timezone,
   overlays = [],
+  bodyName = 'sol',
 }: {
   data: TrajectoryResponse
   timezone: string
   overlays?: SunPathOverlay[]
+  /** Cuerpo graficado, para los textos (`sol` o `luna`). */
+  bodyName?: 'sol' | 'luna'
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const legendHeight = overlays.length > 0 ? (overlays.length + 1) * LEGEND_ROW_HEIGHT + 8 : 0
@@ -85,7 +88,9 @@ export function SunPathChart({
 
   if (visible.length === 0) {
     return (
-      <p style={{ color: 'var(--text-secondary)' }}>El sol no sale este día en esta ubicación.</p>
+      <p style={{ color: 'var(--text-secondary)' }}>
+        {bodyName === 'sol' ? 'El sol no sale' : 'La luna no sale'} este día en esta ubicación.
+      </p>
     )
   }
 
@@ -123,7 +128,7 @@ export function SunPathChart({
         height="100%"
         viewBox={`0 0 ${SIZE} ${totalHeight}`}
         role="img"
-        aria-label="Trayectoria del sol a lo largo del día"
+        aria-label={`Trayectoria ${bodyName === 'sol' ? 'del sol' : 'de la luna'} a lo largo del día`}
       >
         {ALTITUDE_RINGS.map((altitude) => (
           <circle
@@ -235,7 +240,7 @@ export function SunPathChart({
           fontSize={11}
           fill="var(--text-secondary)"
         >
-          mediodía
+          {bodyName === 'sol' ? 'mediodía' : 'culmina'}
         </text>
 
         {visible.map((s) => {

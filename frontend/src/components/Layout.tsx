@@ -15,6 +15,10 @@ const NAV_ITEMS = [
   { to: '/crepusculos', label: 'Crepúsculos' },
   { to: '/estaciones', label: 'Estaciones' },
   { to: '/panel', label: 'Panel solar' },
+  { to: '/luna', label: 'Luna' },
+  { to: '/eclipses', label: 'Eclipses' },
+  { to: '/mareas', label: 'Mareas' },
+  { to: '/pascua', label: 'Pascua' },
 ]
 
 const smallButtonStyle = {

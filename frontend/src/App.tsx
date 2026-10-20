@@ -7,10 +7,15 @@ import Irradiancia from './pages/Irradiancia'
 import Crepusculos from './pages/Crepusculos'
 import Estaciones from './pages/Estaciones'
 import PanelSolar from './pages/PanelSolar'
+import Luna from './pages/Luna'
+import Eclipses from './pages/Eclipses'
+import Mareas from './pages/Mareas'
+import Pascua from './pages/Pascua'
 
 /** Una ruta por feature del plan técnico (sección 5): horas de sol
  * (puntos 1+2), trayectoria (punto 3), mediodía (punto 4), irradiancia
- * (punto 5), más crepúsculos, estaciones y panel solar. `Layout` comparte
+ * (punto 5), más crepúsculos, estaciones y panel solar, y los de la
+ * etapa 2: Luna, eclipses, mareas teóricas y Pascua. `Layout` comparte
  * la navegación, la ubicación y la fecha. */
 export default function App() {
   return (
@@ -23,6 +28,10 @@ export default function App() {
         <Route path="crepusculos" element={<Crepusculos />} />
         <Route path="estaciones" element={<Estaciones />} />
         <Route path="panel" element={<PanelSolar />} />
+        <Route path="luna" element={<Luna />} />
+        <Route path="eclipses" element={<Eclipses />} />
+        <Route path="mareas" element={<Mareas />} />
+        <Route path="pascua" element={<Pascua />} />
       </Route>
     </Routes>
   )

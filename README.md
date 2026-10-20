@@ -2,11 +2,13 @@
 
 Aplicación web para calcular y visualizar fenómenos solares (horas de sol,
 trayectoria del sol, mediodía solar, crepúsculos, estaciones, irradiancia y
-orientación óptima de paneles) a partir de la latitud/longitud del
-observador y la fecha. Pensada como base escalable para etapas futuras
-(Luna, eclipses, calendario, mareas teóricas, meteorología).
+orientación óptima de paneles) y de la Luna (fases, salida y puesta,
+perigeo y apogeo, eclipses, mareas teóricas y Pascua) a partir de la
+latitud/longitud del observador y la fecha. Pensada como base escalable
+para etapas futuras (meteorología).
 
-**Estado actual: etapa 1 (Sol) completa.** Ver
+**Estado actual: etapas 1 (Sol) y 2 (Luna, eclipses, calendario y mareas
+teóricas) completas.** Ver
 [`docs/plan_tecnico.md`](docs/plan_tecnico.md) para la arquitectura, las
 fórmulas por módulo, la precisión verificada y el plan de las etapas 2 y 3.
 
@@ -21,6 +23,10 @@ fórmulas por módulo, la precisión verificada y el plan de las etapas 2 y 3.
 | Crepúsculos | `GET /sol/crepusculos` | Civil, náutico, astronómico, hora azul y hora dorada |
 | Estaciones | `GET /sol/estaciones` | Equinoccios y solsticios del año |
 | Panel solar | `GET /sol/panel` | Inclinación y orientación óptimas de un panel fijo |
+| Luna | `GET /luna/dia`, `/luna/trayectoria`, `/luna/fases`, `/luna/apsides` | Fase e iluminación, salida/tránsito/puesta, trayectoria, fases y perigeo/apogeo del año |
+| Eclipses | `GET /eclipses/anio` | Eclipses de Sol y de Luna del año (condiciones globales; visibilidad lunar por ubicación) |
+| Mareas | `GET /mareas/dia` | Marea de equilibrio del Sol y la Luna, pleamares y bajamares teóricas, mareas vivas y muertas |
+| Pascua | `GET /calendario/pascua` | Pascua occidental y ortodoxa |
 
 La documentación interactiva de la API está en `/docs` (Swagger) con el
 backend corriendo.
@@ -68,8 +74,10 @@ cd frontend && npm run lint && npm test && npm run build
 ```
 
 La CI (`.github/workflows/ci.yml`) corre lo mismo. Los tests del motor
-incluyen ejemplos numéricos de Meeus y una verificación de orto/ocaso contra
-astropy (ver `backend/tests/solar/test_reference.py`).
+incluyen los ejemplos numéricos de Meeus y comparaciones contra astropy
+(orto/ocaso del Sol y de la Luna, posición lunar, fases, perigeo y apogeo,
+eclipses reales de 2023 a 2026): ver `backend/tests/solar/test_reference.py`,
+`test_moon.py`, `test_phases.py`, `test_apsides.py` y `test_eclipses.py`.
 
 ## Estructura
 
@@ -77,7 +85,7 @@ astropy (ver `backend/tests/solar/test_reference.py`).
 ephemeris/
 ├── docs/               # plan técnico y brief original del proyecto
 ├── backend/            # FastAPI + motor de cálculo astronómico
-│   └── app/solar/      # motor puro (sin FastAPI): tiempo, posición, eventos, irradiancia
+│   └── app/solar/      # motor puro (sin FastAPI): tiempo, Sol, Luna, eclipses, mareas, irradiancia
 └── frontend/           # React + TypeScript + Vite
 ```
 
@@ -88,5 +96,5 @@ Los algoritmos astronómicos se basan en *Astronomical Algorithms* (2nd ed.) y
 que Meeus no cubre: el *Explanatory Supplement to the Astronomical Almanac*
 (escalas de tiempo, ΔT), *Methods of Astrodynamics* de Vallado (tiempo,
 sidéreo, posición del Sol) y *Computer Programs for Sun and Moon
-Illuminance* de Janiczek y DeYoung (iluminancia; previsto para la etapa 2).
+Illuminance* de Janiczek y DeYoung (iluminancia; todavía sin usar).
 Los libros no se distribuyen con el repositorio.
